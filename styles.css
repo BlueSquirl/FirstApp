@@ -286,8 +286,24 @@ button.secondary {
   fill: transparent;
 }
 
+.star-icon.filled {
+  fill: #f3c94b;
+}
+
 .favorite-btn.active .star-icon {
   fill: #f3c94b;
+}
+
+.price-star {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.price-star .star-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .map-pane {

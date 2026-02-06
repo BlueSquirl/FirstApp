@@ -248,6 +248,21 @@ function favoriteButtonHTML(isFavorite, label = "Favorite") {
   `;
 }
 
+function favoriteIndicatorHTML(isFavorite) {
+  if (!isFavorite) {
+    return "";
+  }
+  return `
+    <span class="price-star" aria-label="Favorited" title="Favorited">
+      <svg class="star-icon filled" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          d="M12 3.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.48L12 18.98l-5.8 3.4 1.11-6.48-4.7-4.58 6.49-.94L12 3.5z"
+        />
+      </svg>
+    </span>
+  `;
+}
+
 function getFilters() {
   const selectedSources = Array.from(
     document.querySelectorAll('input[name="source"]:checked')
@@ -312,6 +327,7 @@ function renderFavorites() {
   elements.favoritesList.innerHTML = "";
 
   favorites.forEach((contract) => {
+    const isFavorite = favoriteIds.has(contract.id);
     const card = document.createElement("article");
     card.className = "card";
     card.dataset.id = contract.id;
@@ -323,7 +339,7 @@ function renderFavorites() {
       <div class="card-details">
         <div><span>Agency:</span> ${contract.agency}</div>
         <div><span>Location:</span> ${contract.location}</div>
-        <div><span>Value:</span> ${formatValue(contract.value)}</div>
+        <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
       </div>
       <div class="card-actions">
         <div class="card-meta">${contract.category}</div>
@@ -414,7 +430,7 @@ function renderList(results) {
       <div class="card-details">
         <div><span>Agency:</span> ${contract.agency}</div>
         <div><span>Location:</span> ${contract.location}</div>
-        <div><span>Value:</span> ${formatValue(contract.value)}</div>
+        <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
         <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
       </div>
       <div class="card-actions">
