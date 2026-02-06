@@ -235,20 +235,21 @@ function formatDate(isoDate) {
   });
 }
 
-function favoriteButtonHTML(isFavorite, label = "Add to Favorites") {
+function favoriteButtonHTML(isFavorite, label = "Add to favorites") {
   return `
     <button
-      class="favorite-btn ${isFavorite ? "active" : ""}"
+      class="favorite-btn icon-only ${isFavorite ? "active" : ""}"
       data-action="favorite"
       type="button"
       aria-pressed="${isFavorite}"
+      aria-label="${label}"
+      title="${label}"
     >
       <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path
           d="M12 3.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.48L12 18.98l-5.8 3.4 1.11-6.48-4.7-4.58 6.49-.94L12 3.5z"
         />
       </svg>
-      ${label}
     </button>
   `;
 }
@@ -266,6 +267,13 @@ function favoriteIndicatorHTML(isFavorite) {
       </svg>
     </span>
   `;
+}
+
+function truncateTitle(title, maxLength = 30) {
+  if (!title || title.length <= maxLength) {
+    return title;
+  }
+  return `${title.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
 function getCurrentUserId() {
@@ -371,12 +379,16 @@ function renderFavorites() {
 
   favorites.forEach((contract) => {
     const isFavorite = favoriteIdsForUser.includes(contract.id);
+    const truncatedTitle = truncateTitle(contract.title);
     const card = document.createElement("article");
     card.className = "card";
     card.dataset.id = contract.id;
     card.innerHTML = `
       <div class="card-header">
-        <h3>${contract.title}</h3>
+        <div class="card-title-row">
+          ${favoriteButtonHTML(true, "Remove from favorites")}
+          <h3 title="${contract.title}">${truncatedTitle}</h3>
+        </div>
         <span class="tag">${contract.source}</span>
       </div>
       <div class="card-details">
@@ -386,10 +398,6 @@ function renderFavorites() {
       </div>
       <div class="card-actions">
         <div class="card-meta">${contract.category}</div>
-        <div class="action-buttons">
-          ${favoriteButtonHTML(true, "Favorited")}
-          <button data-action="focus">View on map</button>
-        </div>
       </div>
     `;
     elements.favoritesList.appendChild(card);
@@ -470,7 +478,8 @@ function renderList(results) {
   results.forEach((contract, index) => {
     const isFavorite = favoriteIds.has(contract.id);
     const locked = isJobLocked(index, isPremium);
-    const favoriteLabel = isFavorite ? "Favorited" : "Add to Favorites";
+    const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
+    const truncatedTitle = truncateTitle(contract.title);
     const card = document.createElement("article");
     card.className = locked ? "card locked" : "card";
     card.dataset.id = contract.id;
@@ -491,28 +500,19 @@ function renderList(results) {
           <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
         </div>
       `;
-    const actionsMarkup = locked
-      ? `
-        <div class="card-actions locked-content" aria-hidden="true">
+    const actionsMarkup = `
+        <div class="card-actions ${locked ? "locked-content" : ""}" aria-hidden="${
+      locked ? "true" : "false"
+    }">
           <div class="card-meta">${contract.category}</div>
-          <div class="action-buttons">
-            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
-            <button data-action="focus">View on map</button>
-          </div>
-        </div>
-      `
-      : `
-        <div class="card-actions">
-          <div class="card-meta">${contract.category}</div>
-          <div class="action-buttons">
-            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
-            <button data-action="focus">View on map</button>
-          </div>
         </div>
       `;
     card.innerHTML = `
       <div class="card-header">
-        <h3>${contract.title}</h3>
+        <div class="card-title-row">
+          ${favoriteButtonHTML(isFavorite, favoriteLabel)}
+          <h3 title="${contract.title}">${truncatedTitle}</h3>
+        </div>
         <span class="tag">${contract.source}</span>
       </div>
       ${detailsMarkup}
@@ -542,6 +542,15 @@ function renderMarkers(results) {
     marker.on("click", () => highlightCard(contract.id));
     markersById.set(contract.id, marker);
   });
+}
+
+function focusOnContract(contractId) {
+  const marker = markersById.get(contractId);
+  if (marker) {
+    map.setView(marker.getLatLng(), 10, { animate: true });
+    marker.openPopup();
+    highlightCard(contractId);
+  }
 }
 
 function applyAutoOpenResults() {
@@ -585,58 +594,32 @@ elements.resultsList.addEventListener("click", (event) => {
     return;
   }
 
-  const button = event.target.closest("[data-action]");
-  if (!button) {
-    return;
-  }
-
   const contractId = card.dataset.id;
-  const action = button.dataset.action;
-
-  if (action === "favorite") {
+  const button = event.target.closest("[data-action]");
+  if (button && button.dataset.action === "favorite") {
     toggleFavorite(contractId);
     return;
   }
-
-  if (action === "focus") {
-    const marker = markersById.get(contractId);
-    if (marker) {
-      map.setView(marker.getLatLng(), 10, { animate: true });
-      marker.openPopup();
-      highlightCard(contractId);
-    }
-  }
+  focusOnContract(contractId);
 });
 
 elements.favoritesList.addEventListener("click", (event) => {
   if (!Auth.requirePremium()) {
     return;
   }
-  const button = event.target.closest("[data-action]");
-  if (!button) {
-    return;
-  }
 
-  const card = button.closest(".card");
+  const card = event.target.closest(".card");
   if (!card) {
     return;
   }
 
   const contractId = card.dataset.id;
-  const action = button.dataset.action;
-
-  if (action === "favorite") {
+  const button = event.target.closest("[data-action]");
+  if (button && button.dataset.action === "favorite") {
     toggleFavorite(contractId);
     return;
   }
-
-  if (action === "focus") {
-    const marker = markersById.get(contractId);
-    if (marker) {
-      map.setView(marker.getLatLng(), 10, { animate: true });
-      marker.openPopup();
-    }
-  }
+  focusOnContract(contractId);
 });
 
 elements.resetFilters.addEventListener("click", () => {
