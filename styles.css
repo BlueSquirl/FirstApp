@@ -261,6 +261,43 @@ button.secondary {
   z-index: 600;
 }
 
+.price-pin.leaflet-div-icon {
+  background: transparent;
+  border: none;
+}
+
+.price-pin {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.pin-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #1e4bd1;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 10px 18px rgba(30, 75, 209, 0.25);
+  white-space: nowrap;
+}
+
+.pin-label::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: #1e4bd1 transparent transparent transparent;
+}
+
 .map-toggle {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid #d3dced;

@@ -174,6 +174,25 @@ function formatValue(value) {
   return currencyFormatter.format(value);
 }
 
+function formatShortValue(value) {
+  if (value >= 1_000_000_000) {
+    const compact = value / 1_000_000_000;
+    const digits = compact >= 100 ? 0 : 1;
+    return `$${compact.toFixed(digits)}B`;
+  }
+  if (value >= 1_000_000) {
+    const compact = value / 1_000_000;
+    const digits = compact >= 100 ? 0 : 1;
+    return `$${compact.toFixed(digits)}M`;
+  }
+  if (value >= 1_000) {
+    const compact = value / 1_000;
+    const digits = compact >= 100 ? 0 : 1;
+    return `$${compact.toFixed(digits)}K`;
+  }
+  return `$${value.toLocaleString("en-US")}`;
+}
+
 function formatDate(isoDate) {
   const date = new Date(isoDate);
   return date.toLocaleDateString("en-US", {
@@ -258,6 +277,16 @@ function clearMarkers() {
   markersById.clear();
 }
 
+function createPriceIcon(value) {
+  return L.divIcon({
+    className: "price-pin",
+    html: `<span class="pin-label">${formatShortValue(value)}</span>`,
+    iconSize: [80, 36],
+    iconAnchor: [40, 36],
+    popupAnchor: [0, -30],
+  });
+}
+
 function createPopupContent(contract) {
   return `
     <div class="popup">
@@ -311,7 +340,9 @@ function renderList(results) {
 function renderMarkers(results) {
   clearMarkers();
   results.forEach((contract) => {
-    const marker = L.marker([contract.lat, contract.lng]).addTo(markersLayer);
+    const marker = L.marker([contract.lat, contract.lng], {
+      icon: createPriceIcon(contract.value),
+    }).addTo(markersLayer);
     marker.bindPopup(createPopupContent(contract));
     marker.on("click", () => highlightCard(contract.id));
     markersById.set(contract.id, marker);
