@@ -139,6 +139,10 @@ const elements = {
   resultsList: document.getElementById("resultsList"),
   resultsCount: document.getElementById("resultsCount"),
   emptyState: document.getElementById("emptyState"),
+  filtersToggle: document.getElementById("filtersToggle"),
+  resultsToggle: document.getElementById("resultsToggle"),
+  filtersPanel: document.getElementById("filtersPanel"),
+  resultsPanel: document.getElementById("resultsPanel"),
 };
 
 const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
@@ -147,6 +151,24 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
+let activePanel = null;
+
+function updatePanels() {
+  const isFiltersOpen = activePanel === "filters";
+  const isResultsOpen = activePanel === "results";
+
+  elements.filtersPanel.classList.toggle("is-open", isFiltersOpen);
+  elements.resultsPanel.classList.toggle("is-open", isResultsOpen);
+  elements.filtersToggle.classList.toggle("active", isFiltersOpen);
+  elements.resultsToggle.classList.toggle("active", isResultsOpen);
+  elements.filtersPanel.setAttribute("aria-hidden", String(!isFiltersOpen));
+  elements.resultsPanel.setAttribute("aria-hidden", String(!isResultsOpen));
+}
+
+function togglePanel(panel) {
+  activePanel = activePanel === panel ? null : panel;
+  updatePanels();
+}
 
 function formatValue(value) {
   return currencyFormatter.format(value);
@@ -343,6 +365,9 @@ elements.resetFilters.addEventListener("click", () => {
   });
   render();
 });
+
+elements.filtersToggle.addEventListener("click", () => togglePanel("filters"));
+elements.resultsToggle.addEventListener("click", () => togglePanel("results"));
 
 [
   elements.searchInput,

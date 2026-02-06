@@ -27,83 +27,89 @@
       </header>
 
       <div class="content">
-        <aside class="sidebar">
-          <section class="panel">
-            <h2>Filters</h2>
-            <label class="field">
-              Search by keyword or agency
-              <input id="searchInput" type="text" placeholder="Bridge, sewer, DOT District 4" />
-            </label>
-
-            <div class="field">
-              <span class="field-title">Sources</span>
-              <label class="checkbox">
-                <input type="checkbox" name="source" value="CivCast" checked />
-                CivCast
-              </label>
-              <label class="checkbox">
-                <input type="checkbox" name="source" value="Bonfire" checked />
-                Bonfire
-              </label>
-              <label class="checkbox">
-                <input type="checkbox" name="source" value="SAM.gov" checked />
-                SAM.gov
-              </label>
-            </div>
-
-            <label class="field">
-              Category
-              <select id="categorySelect">
-                <option value="all">All categories</option>
-                <option value="Transportation">Transportation (DOT)</option>
-                <option value="Water">Water & wastewater</option>
-                <option value="Municipal">Municipal facilities</option>
-                <option value="Federal">Federal construction</option>
-                <option value="Energy">Energy & utilities</option>
-              </select>
-            </label>
-
-            <div class="field two-column">
-              <label>
-                Min value ($)
-                <input id="minValue" type="number" placeholder="500000" />
-              </label>
-              <label>
-                Max value ($)
-                <input id="maxValue" type="number" placeholder="15000000" />
-              </label>
-            </div>
-
-            <div class="field two-column">
-              <label>
-                Due by
-                <input id="dueBy" type="date" />
-              </label>
-              <label>
-                Sort by
-                <select id="sortSelect">
-                  <option value="value_desc">Value: high to low</option>
-                  <option value="value_asc">Value: low to high</option>
-                  <option value="due_soon">Due date: soonest</option>
-                  <option value="posted_recent">Posted: newest</option>
-                </select>
-              </label>
-            </div>
-
-            <button id="resetFilters" class="secondary">Reset filters</button>
-          </section>
-
-          <section class="panel results-panel">
-            <div class="results-header">
-              <h2>Opportunities</h2>
-              <span id="resultsCount">0</span>
-            </div>
-            <div id="resultsList" class="results-list"></div>
-          </section>
-        </aside>
-
         <main class="map-pane">
           <div id="map"></div>
+          <div class="map-controls">
+            <button id="filtersToggle" class="map-toggle" type="button">Filters</button>
+            <button id="resultsToggle" class="map-toggle" type="button">Opportunities</button>
+          </div>
+          <aside id="filtersPanel" class="slide-panel" aria-hidden="true">
+            <section class="panel filters-panel">
+              <h2>Filters</h2>
+              <label class="field">
+                Search by keyword or agency
+                <input id="searchInput" type="text" placeholder="Bridge, sewer, DOT District 4" />
+              </label>
+
+              <div class="field">
+                <span class="field-title">Sources</span>
+                <label class="checkbox">
+                  <input type="checkbox" name="source" value="CivCast" checked />
+                  CivCast
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" name="source" value="Bonfire" checked />
+                  Bonfire
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" name="source" value="SAM.gov" checked />
+                  SAM.gov
+                </label>
+              </div>
+
+              <label class="field">
+                Category
+                <select id="categorySelect">
+                  <option value="all">All categories</option>
+                  <option value="Transportation">Transportation (DOT)</option>
+                  <option value="Water">Water & wastewater</option>
+                  <option value="Municipal">Municipal facilities</option>
+                  <option value="Federal">Federal construction</option>
+                  <option value="Energy">Energy & utilities</option>
+                </select>
+              </label>
+
+              <div class="field two-column">
+                <label>
+                  Min value ($)
+                  <input id="minValue" type="number" placeholder="500000" />
+                </label>
+                <label>
+                  Max value ($)
+                  <input id="maxValue" type="number" placeholder="15000000" />
+                </label>
+              </div>
+
+              <div class="field two-column">
+                <label>
+                  Due by
+                  <input id="dueBy" type="date" />
+                </label>
+                <label>
+                  Sort by
+                  <select id="sortSelect">
+                    <option value="value_desc">Value: high to low</option>
+                    <option value="value_asc">Value: low to high</option>
+                    <option value="due_soon">Due date: soonest</option>
+                    <option value="posted_recent">Posted: newest</option>
+                  </select>
+                </label>
+              </div>
+
+              <button id="resetFilters" class="secondary">Reset filters</button>
+            </section>
+          </aside>
+
+          <aside id="resultsPanel" class="slide-panel" aria-hidden="true">
+            <section class="panel results-panel">
+              <div class="results-header">
+                <h2>Opportunities</h2>
+                <span id="resultsCount">0</span>
+              </div>
+              <div id="resultsList" class="results-list"></div>
+            </section>
+          </aside>
+
           <div id="emptyState" class="empty-state hidden">
             No opportunities match your filters. Try widening the value range or
             clearing the date filter.
