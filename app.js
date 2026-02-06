@@ -148,6 +148,9 @@ const elements = {
   favoritesList: document.getElementById("favoritesList"),
   favoritesCount: document.getElementById("favoritesCount"),
   favoritesEmpty: document.getElementById("favoritesEmpty"),
+  favoritesLocked: document.getElementById("favoritesLocked"),
+  favoritesUpgradeBtn: document.getElementById("favoritesUpgradeBtn"),
+  favoritesBadge: document.getElementById("favoritesBadge"),
   showPricesToggle: document.getElementById("showPricesToggle"),
   autoOpenResultsToggle: document.getElementById("autoOpenResultsToggle"),
   mapTab: document.querySelector('.tab-button[data-tab="map"]'),
@@ -162,15 +165,15 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
-const favoriteIds = new Set();
 let activePanel = null;
+let favoriteIds = new Set();
+let lockedJobIds = new Set();
 
 function updatePanels() {
   const isFiltersOpen = activePanel === "filters";
   const isResultsOpen = activePanel === "results";
   const isFavoritesOpen = activePanel === "favorites";
   const isSettingsOpen = activePanel === "settings";
-  const isTabPanelOpen = isFavoritesOpen || isSettingsOpen;
   const activeTab =
     activePanel === "favorites"
       ? "favorites"
@@ -231,6 +234,60 @@ function formatDate(isoDate) {
   });
 }
 
+function favoriteButtonHTML(isFavorite, label = "Add to Favorites") {
+  return `
+    <button
+      class="favorite-btn ${isFavorite ? "active" : ""}"
+      data-action="favorite"
+      type="button"
+      aria-pressed="${isFavorite}"
+    >
+      <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          d="M12 3.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.48L12 18.98l-5.8 3.4 1.11-6.48-4.7-4.58 6.49-.94L12 3.5z"
+        />
+      </svg>
+      ${label}
+    </button>
+  `;
+}
+
+function favoriteIndicatorHTML(isFavorite) {
+  if (!isFavorite) {
+    return "";
+  }
+  return `
+    <span class="price-star" aria-label="Favorited" title="Favorited">
+      <svg class="star-icon filled" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          d="M12 3.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.48L12 18.98l-5.8 3.4 1.11-6.48-4.7-4.58 6.49-.94L12 3.5z"
+        />
+      </svg>
+    </span>
+  `;
+}
+
+function getCurrentUserId() {
+  const user = Auth.getCurrentUser();
+  return user ? user.userId : null;
+}
+
+function refreshFavoriteIds() {
+  const userId = getCurrentUserId();
+  favoriteIds = new Set(Favorites.getFavorites(userId));
+}
+
+function isJobLocked(index, isPremium) {
+  return !isPremium && index >= 3;
+}
+
+function updateFavoritesBadge() {
+  const userId = getCurrentUserId();
+  const count = userId ? Favorites.getFavorites(userId).length : 0;
+  elements.favoritesBadge.textContent = count;
+  elements.favoritesBadge.classList.remove("hidden");
+}
+
 function getFilters() {
   const selectedSources = Array.from(
     document.querySelectorAll('input[name="source"]:checked')
@@ -282,19 +339,37 @@ function matchesFilters(contract, filters) {
 }
 
 function toggleFavorite(contractId) {
-  if (favoriteIds.has(contractId)) {
-    favoriteIds.delete(contractId);
-  } else {
-    favoriteIds.add(contractId);
+  if (!Auth.requirePremium()) {
+    return;
   }
-  render();
+  const userId = getCurrentUserId();
+  if (!userId) {
+    return;
+  }
+  Favorites.toggleFavorite(userId, contractId);
+  refreshFavoriteIds();
 }
 
 function renderFavorites() {
-  const favorites = contractData.filter((contract) => favoriteIds.has(contract.id));
+  const isPremium = Auth.isUserSubscribed();
+  const userId = getCurrentUserId();
+  const favoriteIdsForUser = isPremium && userId ? Favorites.getFavorites(userId) : [];
+  const favorites = contractData.filter((contract) =>
+    favoriteIdsForUser.includes(contract.id)
+  );
+
   elements.favoritesList.innerHTML = "";
+  elements.favoritesLocked.classList.toggle("hidden", isPremium);
+  elements.favoritesUpgradeBtn.classList.toggle("hidden", isPremium);
+  elements.favoritesCount.textContent = isPremium ? `${favorites.length} saved` : "Premium";
+
+  if (!isPremium) {
+    elements.favoritesEmpty.classList.add("hidden");
+    return;
+  }
 
   favorites.forEach((contract) => {
+    const isFavorite = favoriteIdsForUser.includes(contract.id);
     const card = document.createElement("article");
     card.className = "card";
     card.dataset.id = contract.id;
@@ -306,14 +381,12 @@ function renderFavorites() {
       <div class="card-details">
         <div><span>Agency:</span> ${contract.agency}</div>
         <div><span>Location:</span> ${contract.location}</div>
-        <div><span>Value:</span> ${formatValue(contract.value)}</div>
+        <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
       </div>
       <div class="card-actions">
         <div class="card-meta">${contract.category}</div>
         <div class="action-buttons">
-          <button class="favorite-btn active" data-action="favorite" aria-pressed="true">
-            Remove
-          </button>
+          ${favoriteButtonHTML(true, "Favorited")}
           <button data-action="focus">View on map</button>
         </div>
       </div>
@@ -321,7 +394,6 @@ function renderFavorites() {
     elements.favoritesList.appendChild(card);
   });
 
-  elements.favoritesCount.textContent = `${favorites.length} saved`;
   elements.favoritesEmpty.classList.toggle("hidden", favorites.length > 0);
 }
 
@@ -360,14 +432,17 @@ function createPriceIcon(value) {
   });
 }
 
-function createPopupContent(contract) {
+function createPopupContent(contract, isLocked) {
+  const contactLine = isLocked
+    ? "<span>Contact:</span> 🔒 Premium only<br />"
+    : `<span>Contact:</span> ${contract.contact}<br />`;
   return `
     <div class="popup">
       <strong>${contract.title}</strong><br />
       ${contract.location}<br />
       <span>Value:</span> ${formatValue(contract.value)}<br />
       <span>Due:</span> ${formatDate(contract.dueDate)}<br />
-      <span>Contact:</span> ${contract.contact}<br />
+      ${contactLine}
       <a href="${contract.url}" target="_blank" rel="noopener noreferrer">View source</a>
     </div>
   `;
@@ -386,36 +461,67 @@ function highlightCard(contractId) {
 
 function renderList(results) {
   elements.resultsList.innerHTML = "";
-  results.forEach((contract) => {
+  const isPremium = Auth.isUserSubscribed();
+  results.forEach((contract, index) => {
     const isFavorite = favoriteIds.has(contract.id);
-    const favoriteLabel = isFavorite ? "Saved" : "Save";
+    const locked = isJobLocked(index, isPremium);
+    const favoriteLabel = isFavorite ? "Favorited" : "Add to Favorites";
     const card = document.createElement("article");
-    card.className = "card";
+    card.className = locked ? "card locked" : "card";
     card.dataset.id = contract.id;
+    const detailsMarkup = locked
+      ? `
+        <div class="card-details locked-content" aria-hidden="true">
+          <div><span>Agency:</span> [BLURRED]</div>
+          <div><span>Location:</span> [BLURRED]</div>
+          <div><span>Value:</span> [BLURRED]</div>
+          <div><span>Due:</span> [BLURRED]</div>
+        </div>
+      `
+      : `
+        <div class="card-details">
+          <div><span>Agency:</span> ${contract.agency}</div>
+          <div><span>Location:</span> ${contract.location}</div>
+          <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
+          <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
+        </div>
+      `;
+    const actionsMarkup = locked
+      ? `
+        <div class="card-actions locked-content" aria-hidden="true">
+          <div class="card-meta">${contract.category}</div>
+          <div class="action-buttons">
+            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
+            <button data-action="focus">View on map</button>
+          </div>
+        </div>
+      `
+      : `
+        <div class="card-actions">
+          <div class="card-meta">${contract.category}</div>
+          <div class="action-buttons">
+            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
+            <button data-action="focus">View on map</button>
+          </div>
+        </div>
+      `;
     card.innerHTML = `
       <div class="card-header">
         <h3>${contract.title}</h3>
         <span class="tag">${contract.source}</span>
       </div>
-      <div class="card-details">
-        <div><span>Agency:</span> ${contract.agency}</div>
-        <div><span>Location:</span> ${contract.location}</div>
-        <div><span>Value:</span> ${formatValue(contract.value)}</div>
-        <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
-      </div>
-      <div class="card-actions">
-        <div class="card-meta">${contract.category}</div>
-        <div class="action-buttons">
-          <button
-            class="favorite-btn ${isFavorite ? "active" : ""}"
-            data-action="favorite"
-            aria-pressed="${isFavorite}"
-          >
-            ${favoriteLabel}
-          </button>
-          <button data-action="focus">View on map</button>
+      ${detailsMarkup}
+      ${actionsMarkup}
+      ${
+        locked
+          ? `
+        <div class="lock-overlay">
+          <div>🔒 Unlock with Premium - $20/month</div>
+          <button class="upgrade-cta" data-action="upgrade" type="button">Upgrade Now</button>
         </div>
-      </div>
+      `
+          : ""
+      }
     `;
     elements.resultsList.appendChild(card);
   });
@@ -427,7 +533,7 @@ function renderMarkers(results) {
     const marker = L.marker([contract.lat, contract.lng], {
       icon: createPriceIcon(contract.value),
     }).addTo(markersLayer);
-    marker.bindPopup(createPopupContent(contract));
+    marker.bindPopup(createPopupContent(contract, lockedJobIds.has(contract.id)));
     marker.on("click", () => highlightCard(contract.id));
     markersById.set(contract.id, marker);
   });
@@ -449,25 +555,33 @@ function updateCounts(count) {
 }
 
 function render() {
+  refreshFavoriteIds();
   const filters = getFilters();
   const filtered = contractData.filter((contract) => matchesFilters(contract, filters));
   const results = sortResults(filtered, filters.sortBy);
+  const isPremium = Auth.isUserSubscribed();
+  lockedJobIds = isPremium ? new Set() : new Set(results.slice(3).map((item) => item.id));
 
   renderList(results);
   renderMarkers(results);
   updateCounts(results.length);
   renderFavorites();
+  updateFavoritesBadge();
   applyAutoOpenResults();
 }
 
 elements.resultsList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-action]");
-  if (!button) {
+  const card = event.target.closest(".card");
+  if (!card) {
+    return;
+  }
+  if (card.classList.contains("locked")) {
+    Auth.requirePremium();
     return;
   }
 
-  const card = button.closest(".card");
-  if (!card) {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
     return;
   }
 
@@ -490,6 +604,9 @@ elements.resultsList.addEventListener("click", (event) => {
 });
 
 elements.favoritesList.addEventListener("click", (event) => {
+  if (!Auth.requirePremium()) {
+    return;
+  }
   const button = event.target.closest("[data-action]");
   if (!button) {
     return;
@@ -548,6 +665,14 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
   }
 });
 
+elements.favoritesUpgradeBtn.addEventListener("click", () => Auth.openUpgradeModal());
+Auth.onAuthChange(() => {
+  render();
+});
+Favorites.onChange(() => {
+  render();
+});
+
 [
   elements.searchInput,
   elements.categorySelect,
@@ -559,5 +684,6 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
 ].forEach((input) => input.addEventListener("input", render));
 
 document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
+Auth.initAuth();
 updatePanels();
 render();
