@@ -157,12 +157,23 @@ const elements = {
   favoritesTab: document.querySelector('.tab-button[data-tab="favorites"]'),
   settingsTab: document.querySelector('.tab-button[data-tab="settings"]'),
   mapControls: document.querySelector(".map-controls"),
+  mapPane: document.querySelector(".map-pane"),
 };
 
 const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
+map.on("popupopen", () => {
+  if (elements.mapPane) {
+    elements.mapPane.classList.add("has-popup");
+  }
+});
+map.on("popupclose", () => {
+  if (elements.mapPane) {
+    elements.mapPane.classList.remove("has-popup");
+  }
+});
 const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
 let activePanel = null;
@@ -454,8 +465,12 @@ function highlightCard(contractId) {
     card.classList.toggle("active", card.dataset.id === contractId);
   });
   const activeCard = elements.resultsList.querySelector(`[data-id="${contractId}"]`);
-  if (activeCard) {
-    activeCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (activeCard && elements.resultsPanel.classList.contains("is-open")) {
+    activeCard.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
   }
 }
 
