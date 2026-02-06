@@ -193,6 +193,8 @@ button.secondary {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .favorites-panel,
@@ -256,10 +258,12 @@ button.secondary {
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 4px;
   flex: 1;
   min-height: 0;
   padding-bottom: 12px;
+  max-width: 100%;
 }
 
 .card {
@@ -273,6 +277,8 @@ button.secondary {
   gap: 8px;
   min-height: 180px;
   transition: border 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .card.active {
@@ -297,6 +303,8 @@ button.secondary {
   height: fit-content;
   display: inline-flex;
   margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .card h3 {
@@ -304,6 +312,8 @@ button.secondary {
   color: #1b2b4b;
   overflow-wrap: anywhere;
   word-break: break-word;
+  line-height: 1.4;
+  margin-bottom: 8px;
 }
 
 .card-details {
@@ -312,6 +322,8 @@ button.secondary {
   font-size: 12px;
   color: #5b6b88;
   min-height: 84px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .card-details div {
@@ -328,10 +340,11 @@ button.secondary {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 6px;
+  margin-top: auto;
   min-height: 32px;
   gap: 8px;
   flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .action-buttons {
@@ -339,6 +352,7 @@ button.secondary {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .card button {
@@ -348,6 +362,9 @@ button.secondary {
   padding: 6px 12px;
   max-width: 100%;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 .favorite-btn {
@@ -427,6 +444,13 @@ button.secondary {
   display: flex;
   gap: 8px;
   z-index: 800;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.slide-panel.is-open ~ .map-controls {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(20px);
 }
 
 .price-pin.leaflet-div-icon {
@@ -757,6 +781,7 @@ button.secondary {
   opacity: 0;
   pointer-events: none;
   transition: transform 0.25s ease, opacity 0.25s ease;
+  overflow: hidden;
 }
 
 .slide-panel.is-open {
@@ -769,6 +794,8 @@ button.secondary {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .filters-panel {
