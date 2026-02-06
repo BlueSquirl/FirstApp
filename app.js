@@ -153,6 +153,7 @@ const elements = {
   mapTab: document.querySelector('.tab-button[data-tab="map"]'),
   favoritesTab: document.querySelector('.tab-button[data-tab="favorites"]'),
   settingsTab: document.querySelector('.tab-button[data-tab="settings"]'),
+  mapControls: document.querySelector(".map-controls"),
 };
 
 const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
@@ -169,6 +170,7 @@ function updatePanels() {
   const isResultsOpen = activePanel === "results";
   const isFavoritesOpen = activePanel === "favorites";
   const isSettingsOpen = activePanel === "settings";
+  const isTabPanelOpen = isFavoritesOpen || isSettingsOpen;
   const activeTab =
     activePanel === "favorites"
       ? "favorites"
@@ -186,6 +188,7 @@ function updatePanels() {
   elements.resultsPanel.setAttribute("aria-hidden", String(!isResultsOpen));
   elements.favoritesPanel.setAttribute("aria-hidden", String(!isFavoritesOpen));
   elements.settingsPanel.setAttribute("aria-hidden", String(!isSettingsOpen));
+  elements.mapControls.classList.toggle("hidden", isTabPanelOpen);
   elements.mapTab.classList.toggle("active", activeTab === "map");
   elements.favoritesTab.classList.toggle("active", activeTab === "favorites");
   elements.settingsTab.classList.toggle("active", activeTab === "settings");
