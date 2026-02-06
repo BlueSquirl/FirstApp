@@ -266,7 +266,7 @@ button.secondary {
   position: relative;
   border: 1px solid #e0e6ef;
   border-radius: 12px;
-  padding: 16px;
+  padding: 16px 16px 20px;
   background: #fdfdff;
   display: flex;
   flex-direction: column;
