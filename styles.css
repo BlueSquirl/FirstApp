@@ -67,22 +67,6 @@ p {
   gap: 16px;
 }
 
-.price {
-  display: flex;
-  flex-direction: column;
-  text-align: right;
-}
-
-.price .amount {
-  font-weight: 700;
-  font-size: 20px;
-}
-
-.price .term {
-  color: #5b6b88;
-  font-size: 12px;
-}
-
 button {
   cursor: pointer;
   border: none;
