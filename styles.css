@@ -267,6 +267,7 @@ button.secondary {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 180px;
   transition: border 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -300,6 +301,7 @@ button.secondary {
   gap: 6px;
   font-size: 12px;
   color: #5b6b88;
+  min-height: 84px;
 }
 
 .card-details span {
@@ -312,6 +314,7 @@ button.secondary {
   justify-content: space-between;
   align-items: center;
   margin-top: 6px;
+  min-height: 32px;
 }
 
 .action-buttons {
@@ -383,6 +386,10 @@ button.secondary {
   min-height: 320px;
 }
 
+.leaflet-popup {
+  z-index: 700;
+}
+
 .map-controls {
   position: absolute;
   top: 20px;
@@ -390,6 +397,11 @@ button.secondary {
   display: flex;
   gap: 8px;
   z-index: 600;
+  transition: transform 0.2s ease;
+}
+
+.map-pane.has-popup .map-controls {
+  transform: translateY(56px);
 }
 
 .price-pin.leaflet-div-icon {
