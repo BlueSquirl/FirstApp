@@ -29,10 +29,6 @@
       <div class="content">
         <main class="map-pane">
           <div id="map"></div>
-          <div class="map-controls">
-            <button id="filtersToggle" class="map-toggle" type="button">Filters</button>
-            <button id="resultsToggle" class="map-toggle" type="button">Opportunities</button>
-          </div>
           <aside id="filtersPanel" class="slide-panel" aria-hidden="true">
             <section class="panel filters-panel">
               <h2>Filters</h2>
@@ -152,6 +148,11 @@
               </label>
             </section>
           </aside>
+
+          <div class="map-controls">
+            <button id="filtersToggle" class="map-toggle" type="button">Filters</button>
+            <button id="resultsToggle" class="map-toggle" type="button">Opportunities</button>
+          </div>
 
           <div id="emptyState" class="empty-state hidden">
             No opportunities match your filters. Try widening the value range or
