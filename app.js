@@ -148,25 +148,15 @@ const elements = {
   favoritesList: document.getElementById("favoritesList"),
   favoritesCount: document.getElementById("favoritesCount"),
   favoritesEmpty: document.getElementById("favoritesEmpty"),
+  favoritesLocked: document.getElementById("favoritesLocked"),
+  favoritesUpgradeBtn: document.getElementById("favoritesUpgradeBtn"),
+  favoritesBadge: document.getElementById("favoritesBadge"),
   showPricesToggle: document.getElementById("showPricesToggle"),
   autoOpenResultsToggle: document.getElementById("autoOpenResultsToggle"),
   mapTab: document.querySelector('.tab-button[data-tab="map"]'),
   favoritesTab: document.querySelector('.tab-button[data-tab="favorites"]'),
   settingsTab: document.querySelector('.tab-button[data-tab="settings"]'),
   mapControls: document.querySelector(".map-controls"),
-  loginBtn: document.getElementById("loginBtn"),
-  signupBtn: document.getElementById("signupBtn"),
-  logoutBtn: document.getElementById("logoutBtn"),
-  userEmail: document.getElementById("userEmail"),
-  authModal: document.getElementById("authModal"),
-  authTitle: document.getElementById("authTitle"),
-  authSubtitle: document.getElementById("authSubtitle"),
-  loginForm: document.getElementById("loginForm"),
-  signupForm: document.getElementById("signupForm"),
-  loginEmail: document.getElementById("loginEmail"),
-  signupEmail: document.getElementById("signupEmail"),
-  loginError: document.getElementById("loginError"),
-  signupError: document.getElementById("signupError"),
 };
 
 const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
@@ -175,105 +165,15 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
-const favoriteIds = new Set();
 let activePanel = null;
-let currentUser = null;
-let authMode = "login";
-
-const USERS_KEY = "cm_users";
-const CURRENT_USER_KEY = "cm_current_user_id";
-
-function generateUserId() {
-  if (window.crypto && window.crypto.getRandomValues) {
-    const bytes = new Uint8Array(6);
-    window.crypto.getRandomValues(bytes);
-    return `user_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
-  }
-  return `user_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
-}
-
-function loadUsers() {
-  const raw = localStorage.getItem(USERS_KEY);
-  if (!raw) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-function normalizeEmail(value) {
-  return value.trim().toLowerCase();
-}
-
-function setCurrentUser(user) {
-  currentUser = user;
-  if (user) {
-    localStorage.setItem(CURRENT_USER_KEY, user.userId);
-  } else {
-    localStorage.removeItem(CURRENT_USER_KEY);
-  }
-  updateAuthUI();
-}
-
-function updateAuthUI() {
-  const isLoggedIn = Boolean(currentUser);
-  elements.loginBtn.classList.toggle("hidden", isLoggedIn);
-  elements.signupBtn.classList.toggle("hidden", isLoggedIn);
-  elements.logoutBtn.classList.toggle("hidden", !isLoggedIn);
-  elements.userEmail.classList.toggle("hidden", !isLoggedIn);
-  elements.userEmail.textContent = isLoggedIn ? currentUser.email : "";
-}
-
-function setFormError(target, message) {
-  target.textContent = message;
-  target.classList.toggle("hidden", !message);
-}
-
-function setAuthMode(mode) {
-  authMode = mode;
-  const isLogin = mode === "login";
-  elements.loginForm.classList.toggle("hidden", !isLogin);
-  elements.signupForm.classList.toggle("hidden", isLogin);
-  elements.authTitle.textContent = isLogin ? "Welcome back" : "Create your account";
-  elements.authSubtitle.textContent = isLogin
-    ? "Log in to save and track contracts."
-    : "Create a profile to favorite and track bids.";
-  setFormError(elements.loginError, "");
-  setFormError(elements.signupError, "");
-}
-
-function openAuthModal(mode) {
-  setAuthMode(mode);
-  elements.authModal.classList.remove("hidden");
-  elements.authModal.setAttribute("aria-hidden", "false");
-}
-
-function closeAuthModal() {
-  elements.authModal.classList.add("hidden");
-  elements.authModal.setAttribute("aria-hidden", "true");
-}
-
-function initAuth() {
-  const users = loadUsers();
-  const currentId = localStorage.getItem(CURRENT_USER_KEY);
-  const storedUser = users.find((user) => user.userId === currentId) || null;
-  setCurrentUser(storedUser);
-}
+let favoriteIds = new Set();
+let lockedJobIds = new Set();
 
 function updatePanels() {
   const isFiltersOpen = activePanel === "filters";
   const isResultsOpen = activePanel === "results";
   const isFavoritesOpen = activePanel === "favorites";
   const isSettingsOpen = activePanel === "settings";
-  const isTabPanelOpen = isFavoritesOpen || isSettingsOpen;
   const activeTab =
     activePanel === "favorites"
       ? "favorites"
@@ -334,11 +234,12 @@ function formatDate(isoDate) {
   });
 }
 
-function favoriteButtonHTML(isFavorite, label = "Favorite") {
+function favoriteButtonHTML(isFavorite, label = "Add to Favorites") {
   return `
     <button
       class="favorite-btn ${isFavorite ? "active" : ""}"
       data-action="favorite"
+      type="button"
       aria-pressed="${isFavorite}"
     >
       <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -364,6 +265,27 @@ function favoriteIndicatorHTML(isFavorite) {
       </svg>
     </span>
   `;
+}
+
+function getCurrentUserId() {
+  const user = Auth.getCurrentUser();
+  return user ? user.userId : null;
+}
+
+function refreshFavoriteIds() {
+  const userId = getCurrentUserId();
+  favoriteIds = new Set(Favorites.getFavorites(userId));
+}
+
+function isJobLocked(index, isPremium) {
+  return !isPremium && index >= 3;
+}
+
+function updateFavoritesBadge() {
+  const userId = getCurrentUserId();
+  const count = userId ? Favorites.getFavorites(userId).length : 0;
+  elements.favoritesBadge.textContent = count;
+  elements.favoritesBadge.classList.remove("hidden");
 }
 
 function getFilters() {
@@ -417,20 +339,37 @@ function matchesFilters(contract, filters) {
 }
 
 function toggleFavorite(contractId) {
-  if (favoriteIds.has(contractId)) {
-    favoriteIds.delete(contractId);
-  } else {
-    favoriteIds.add(contractId);
+  if (!Auth.requirePremium()) {
+    return;
   }
-  render();
+  const userId = getCurrentUserId();
+  if (!userId) {
+    return;
+  }
+  Favorites.toggleFavorite(userId, contractId);
+  refreshFavoriteIds();
 }
 
 function renderFavorites() {
-  const favorites = contractData.filter((contract) => favoriteIds.has(contract.id));
+  const isPremium = Auth.isUserSubscribed();
+  const userId = getCurrentUserId();
+  const favoriteIdsForUser = isPremium && userId ? Favorites.getFavorites(userId) : [];
+  const favorites = contractData.filter((contract) =>
+    favoriteIdsForUser.includes(contract.id)
+  );
+
   elements.favoritesList.innerHTML = "";
+  elements.favoritesLocked.classList.toggle("hidden", isPremium);
+  elements.favoritesUpgradeBtn.classList.toggle("hidden", isPremium);
+  elements.favoritesCount.textContent = isPremium ? `${favorites.length} saved` : "Premium";
+
+  if (!isPremium) {
+    elements.favoritesEmpty.classList.add("hidden");
+    return;
+  }
 
   favorites.forEach((contract) => {
-    const isFavorite = favoriteIds.has(contract.id);
+    const isFavorite = favoriteIdsForUser.includes(contract.id);
     const card = document.createElement("article");
     card.className = "card";
     card.dataset.id = contract.id;
@@ -447,7 +386,7 @@ function renderFavorites() {
       <div class="card-actions">
         <div class="card-meta">${contract.category}</div>
         <div class="action-buttons">
-          ${favoriteButtonHTML(true)}
+          ${favoriteButtonHTML(true, "Favorited")}
           <button data-action="focus">View on map</button>
         </div>
       </div>
@@ -455,7 +394,6 @@ function renderFavorites() {
     elements.favoritesList.appendChild(card);
   });
 
-  elements.favoritesCount.textContent = `${favorites.length} saved`;
   elements.favoritesEmpty.classList.toggle("hidden", favorites.length > 0);
 }
 
@@ -494,14 +432,17 @@ function createPriceIcon(value) {
   });
 }
 
-function createPopupContent(contract) {
+function createPopupContent(contract, isLocked) {
+  const contactLine = isLocked
+    ? "<span>Contact:</span> 🔒 Premium only<br />"
+    : `<span>Contact:</span> ${contract.contact}<br />`;
   return `
     <div class="popup">
       <strong>${contract.title}</strong><br />
       ${contract.location}<br />
       <span>Value:</span> ${formatValue(contract.value)}<br />
       <span>Due:</span> ${formatDate(contract.dueDate)}<br />
-      <span>Contact:</span> ${contract.contact}<br />
+      ${contactLine}
       <a href="${contract.url}" target="_blank" rel="noopener noreferrer">View source</a>
     </div>
   `;
@@ -520,29 +461,67 @@ function highlightCard(contractId) {
 
 function renderList(results) {
   elements.resultsList.innerHTML = "";
-  results.forEach((contract) => {
+  const isPremium = Auth.isUserSubscribed();
+  results.forEach((contract, index) => {
     const isFavorite = favoriteIds.has(contract.id);
+    const locked = isJobLocked(index, isPremium);
+    const favoriteLabel = isFavorite ? "Favorited" : "Add to Favorites";
     const card = document.createElement("article");
-    card.className = "card";
+    card.className = locked ? "card locked" : "card";
     card.dataset.id = contract.id;
+    const detailsMarkup = locked
+      ? `
+        <div class="card-details locked-content" aria-hidden="true">
+          <div><span>Agency:</span> [BLURRED]</div>
+          <div><span>Location:</span> [BLURRED]</div>
+          <div><span>Value:</span> [BLURRED]</div>
+          <div><span>Due:</span> [BLURRED]</div>
+        </div>
+      `
+      : `
+        <div class="card-details">
+          <div><span>Agency:</span> ${contract.agency}</div>
+          <div><span>Location:</span> ${contract.location}</div>
+          <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
+          <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
+        </div>
+      `;
+    const actionsMarkup = locked
+      ? `
+        <div class="card-actions locked-content" aria-hidden="true">
+          <div class="card-meta">${contract.category}</div>
+          <div class="action-buttons">
+            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
+            <button data-action="focus">View on map</button>
+          </div>
+        </div>
+      `
+      : `
+        <div class="card-actions">
+          <div class="card-meta">${contract.category}</div>
+          <div class="action-buttons">
+            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
+            <button data-action="focus">View on map</button>
+          </div>
+        </div>
+      `;
     card.innerHTML = `
       <div class="card-header">
         <h3>${contract.title}</h3>
         <span class="tag">${contract.source}</span>
       </div>
-      <div class="card-details">
-        <div><span>Agency:</span> ${contract.agency}</div>
-        <div><span>Location:</span> ${contract.location}</div>
-        <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
-        <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
-      </div>
-      <div class="card-actions">
-        <div class="card-meta">${contract.category}</div>
-        <div class="action-buttons">
-          ${favoriteButtonHTML(isFavorite)}
-          <button data-action="focus">View on map</button>
+      ${detailsMarkup}
+      ${actionsMarkup}
+      ${
+        locked
+          ? `
+        <div class="lock-overlay">
+          <div>🔒 Unlock with Premium - $20/month</div>
+          <button class="upgrade-cta" data-action="upgrade" type="button">Upgrade Now</button>
         </div>
-      </div>
+      `
+          : ""
+      }
     `;
     elements.resultsList.appendChild(card);
   });
@@ -554,7 +533,7 @@ function renderMarkers(results) {
     const marker = L.marker([contract.lat, contract.lng], {
       icon: createPriceIcon(contract.value),
     }).addTo(markersLayer);
-    marker.bindPopup(createPopupContent(contract));
+    marker.bindPopup(createPopupContent(contract, lockedJobIds.has(contract.id)));
     marker.on("click", () => highlightCard(contract.id));
     markersById.set(contract.id, marker);
   });
@@ -576,25 +555,33 @@ function updateCounts(count) {
 }
 
 function render() {
+  refreshFavoriteIds();
   const filters = getFilters();
   const filtered = contractData.filter((contract) => matchesFilters(contract, filters));
   const results = sortResults(filtered, filters.sortBy);
+  const isPremium = Auth.isUserSubscribed();
+  lockedJobIds = isPremium ? new Set() : new Set(results.slice(3).map((item) => item.id));
 
   renderList(results);
   renderMarkers(results);
   updateCounts(results.length);
   renderFavorites();
+  updateFavoritesBadge();
   applyAutoOpenResults();
 }
 
 elements.resultsList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-action]");
-  if (!button) {
+  const card = event.target.closest(".card");
+  if (!card) {
+    return;
+  }
+  if (card.classList.contains("locked")) {
+    Auth.requirePremium();
     return;
   }
 
-  const card = button.closest(".card");
-  if (!card) {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
     return;
   }
 
@@ -617,6 +604,9 @@ elements.resultsList.addEventListener("click", (event) => {
 });
 
 elements.favoritesList.addEventListener("click", (event) => {
+  if (!Auth.requirePremium()) {
+    return;
+  }
   const button = event.target.closest("[data-action]");
   if (!button) {
     return;
@@ -675,66 +665,12 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
   }
 });
 
-elements.loginBtn.addEventListener("click", () => openAuthModal("login"));
-elements.signupBtn.addEventListener("click", () => openAuthModal("signup"));
-elements.logoutBtn.addEventListener("click", () => setCurrentUser(null));
-
-elements.authModal.addEventListener("click", (event) => {
-  const actionElement = event.target.closest("[data-action]");
-  if (!actionElement) {
-    return;
-  }
-  const { action, mode } = actionElement.dataset;
-  if (action === "close") {
-    closeAuthModal();
-  }
-  if (action === "switch") {
-    openAuthModal(mode === "signup" ? "signup" : "login");
-  }
+elements.favoritesUpgradeBtn.addEventListener("click", () => Auth.openUpgradeModal());
+Auth.onAuthChange(() => {
+  render();
 });
-
-elements.loginForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const email = normalizeEmail(elements.loginEmail.value);
-  if (!email) {
-    setFormError(elements.loginError, "Enter your email to log in.");
-    return;
-  }
-  const users = loadUsers();
-  const user = users.find((entry) => entry.email === email);
-  if (!user) {
-    setFormError(elements.loginError, "No account found for that email.");
-    return;
-  }
-  setFormError(elements.loginError, "");
-  setCurrentUser(user);
-  closeAuthModal();
-});
-
-elements.signupForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const email = normalizeEmail(elements.signupEmail.value);
-  if (!email) {
-    setFormError(elements.signupError, "Enter your email to create an account.");
-    return;
-  }
-  const users = loadUsers();
-  if (users.some((entry) => entry.email === email)) {
-    setFormError(elements.signupError, "Account already exists. Log in instead.");
-    return;
-  }
-
-  const newUser = {
-    userId: generateUserId(),
-    email,
-    isSubscribed: false,
-    subscriptionTier: "free",
-  };
-  users.push(newUser);
-  saveUsers(users);
-  setFormError(elements.signupError, "");
-  setCurrentUser(newUser);
-  closeAuthModal();
+Favorites.onChange(() => {
+  render();
 });
 
 [
@@ -748,6 +684,6 @@ elements.signupForm.addEventListener("submit", (event) => {
 ].forEach((input) => input.addEventListener("input", render));
 
 document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
-initAuth();
+Auth.initAuth();
 updatePanels();
 render();
