@@ -188,7 +188,7 @@ function updatePanels() {
   elements.resultsPanel.setAttribute("aria-hidden", String(!isResultsOpen));
   elements.favoritesPanel.setAttribute("aria-hidden", String(!isFavoritesOpen));
   elements.settingsPanel.setAttribute("aria-hidden", String(!isSettingsOpen));
-  elements.mapControls.classList.toggle("hidden", isTabPanelOpen);
+  elements.mapControls.classList.toggle("hidden", activeTab !== "map");
   elements.mapTab.classList.toggle("active", activeTab === "map");
   elements.favoritesTab.classList.toggle("active", activeTab === "favorites");
   elements.settingsTab.classList.toggle("active", activeTab === "settings");
