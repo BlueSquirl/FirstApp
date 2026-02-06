@@ -17,8 +17,11 @@
             <p>See public construction opportunities on one map.</p>
           </div>
         </div>
-        <div class="cta">
-          <button class="primary">Sign In</button>
+        <div class="cta auth-actions">
+          <span id="userEmail" class="user-email hidden"></span>
+          <button id="loginBtn" class="outline" type="button">Login</button>
+          <button id="signupBtn" class="primary" type="button">Sign Up</button>
+          <button id="logoutBtn" class="secondary hidden" type="button">Logout</button>
         </div>
       </header>
 
@@ -136,6 +139,45 @@
           <div id="emptyState" class="empty-state hidden">
             No opportunities match your filters. Try widening the value range or
             clearing the date filter.
+          </div>
+
+          <div id="authModal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="authTitle">
+            <div class="auth-backdrop" data-action="close"></div>
+            <div class="auth-card" role="document">
+              <button class="auth-close" type="button" data-action="close" aria-label="Close">
+                &times;
+              </button>
+              <div class="auth-header">
+                <h2 id="authTitle">Welcome back</h2>
+                <p id="authSubtitle">Log in to save and track contracts.</p>
+              </div>
+
+              <form id="loginForm" class="auth-form">
+                <label class="field">
+                  Email
+                  <input id="loginEmail" type="email" placeholder="you@company.com" required />
+                </label>
+                <p id="loginError" class="form-error hidden"></p>
+                <button class="primary" type="submit">Login</button>
+                <p class="auth-switch">
+                  New here?
+                  <button type="button" data-action="switch" data-mode="signup">Create an account</button>
+                </p>
+              </form>
+
+              <form id="signupForm" class="auth-form hidden">
+                <label class="field">
+                  Email
+                  <input id="signupEmail" type="email" placeholder="you@company.com" required />
+                </label>
+                <p id="signupError" class="form-error hidden"></p>
+                <button class="primary" type="submit">Create account</button>
+                <p class="auth-switch">
+                  Already have an account?
+                  <button type="button" data-action="switch" data-mode="login">Login</button>
+                </p>
+              </form>
+            </div>
           </div>
 
           <nav class="bottom-tabs" aria-label="Primary">

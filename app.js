@@ -154,6 +154,19 @@ const elements = {
   favoritesTab: document.querySelector('.tab-button[data-tab="favorites"]'),
   settingsTab: document.querySelector('.tab-button[data-tab="settings"]'),
   mapControls: document.querySelector(".map-controls"),
+  loginBtn: document.getElementById("loginBtn"),
+  signupBtn: document.getElementById("signupBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  userEmail: document.getElementById("userEmail"),
+  authModal: document.getElementById("authModal"),
+  authTitle: document.getElementById("authTitle"),
+  authSubtitle: document.getElementById("authSubtitle"),
+  loginForm: document.getElementById("loginForm"),
+  signupForm: document.getElementById("signupForm"),
+  loginEmail: document.getElementById("loginEmail"),
+  signupEmail: document.getElementById("signupEmail"),
+  loginError: document.getElementById("loginError"),
+  signupError: document.getElementById("signupError"),
 };
 
 const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
@@ -164,6 +177,96 @@ const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
 const favoriteIds = new Set();
 let activePanel = null;
+let currentUser = null;
+let authMode = "login";
+
+const USERS_KEY = "cm_users";
+const CURRENT_USER_KEY = "cm_current_user_id";
+
+function generateUserId() {
+  if (window.crypto && window.crypto.getRandomValues) {
+    const bytes = new Uint8Array(6);
+    window.crypto.getRandomValues(bytes);
+    return `user_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+  }
+  return `user_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function loadUsers() {
+  const raw = localStorage.getItem(USERS_KEY);
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function normalizeEmail(value) {
+  return value.trim().toLowerCase();
+}
+
+function setCurrentUser(user) {
+  currentUser = user;
+  if (user) {
+    localStorage.setItem(CURRENT_USER_KEY, user.userId);
+  } else {
+    localStorage.removeItem(CURRENT_USER_KEY);
+  }
+  updateAuthUI();
+}
+
+function updateAuthUI() {
+  const isLoggedIn = Boolean(currentUser);
+  elements.loginBtn.classList.toggle("hidden", isLoggedIn);
+  elements.signupBtn.classList.toggle("hidden", isLoggedIn);
+  elements.logoutBtn.classList.toggle("hidden", !isLoggedIn);
+  elements.userEmail.classList.toggle("hidden", !isLoggedIn);
+  elements.userEmail.textContent = isLoggedIn ? currentUser.email : "";
+}
+
+function setFormError(target, message) {
+  target.textContent = message;
+  target.classList.toggle("hidden", !message);
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const isLogin = mode === "login";
+  elements.loginForm.classList.toggle("hidden", !isLogin);
+  elements.signupForm.classList.toggle("hidden", isLogin);
+  elements.authTitle.textContent = isLogin ? "Welcome back" : "Create your account";
+  elements.authSubtitle.textContent = isLogin
+    ? "Log in to save and track contracts."
+    : "Create a profile to favorite and track bids.";
+  setFormError(elements.loginError, "");
+  setFormError(elements.signupError, "");
+}
+
+function openAuthModal(mode) {
+  setAuthMode(mode);
+  elements.authModal.classList.remove("hidden");
+  elements.authModal.setAttribute("aria-hidden", "false");
+}
+
+function closeAuthModal() {
+  elements.authModal.classList.add("hidden");
+  elements.authModal.setAttribute("aria-hidden", "true");
+}
+
+function initAuth() {
+  const users = loadUsers();
+  const currentId = localStorage.getItem(CURRENT_USER_KEY);
+  const storedUser = users.find((user) => user.userId === currentId) || null;
+  setCurrentUser(storedUser);
+}
 
 function updatePanels() {
   const isFiltersOpen = activePanel === "filters";
@@ -572,6 +675,68 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
   }
 });
 
+elements.loginBtn.addEventListener("click", () => openAuthModal("login"));
+elements.signupBtn.addEventListener("click", () => openAuthModal("signup"));
+elements.logoutBtn.addEventListener("click", () => setCurrentUser(null));
+
+elements.authModal.addEventListener("click", (event) => {
+  const actionElement = event.target.closest("[data-action]");
+  if (!actionElement) {
+    return;
+  }
+  const { action, mode } = actionElement.dataset;
+  if (action === "close") {
+    closeAuthModal();
+  }
+  if (action === "switch") {
+    openAuthModal(mode === "signup" ? "signup" : "login");
+  }
+});
+
+elements.loginForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const email = normalizeEmail(elements.loginEmail.value);
+  if (!email) {
+    setFormError(elements.loginError, "Enter your email to log in.");
+    return;
+  }
+  const users = loadUsers();
+  const user = users.find((entry) => entry.email === email);
+  if (!user) {
+    setFormError(elements.loginError, "No account found for that email.");
+    return;
+  }
+  setFormError(elements.loginError, "");
+  setCurrentUser(user);
+  closeAuthModal();
+});
+
+elements.signupForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const email = normalizeEmail(elements.signupEmail.value);
+  if (!email) {
+    setFormError(elements.signupError, "Enter your email to create an account.");
+    return;
+  }
+  const users = loadUsers();
+  if (users.some((entry) => entry.email === email)) {
+    setFormError(elements.signupError, "Account already exists. Log in instead.");
+    return;
+  }
+
+  const newUser = {
+    userId: generateUserId(),
+    email,
+    isSubscribed: false,
+    subscriptionTier: "free",
+  };
+  users.push(newUser);
+  saveUsers(users);
+  setFormError(elements.signupError, "");
+  setCurrentUser(newUser);
+  closeAuthModal();
+});
+
 [
   elements.searchInput,
   elements.categorySelect,
@@ -583,5 +748,6 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
 ].forEach((input) => input.addEventListener("input", render));
 
 document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
+initAuth();
 updatePanels();
 render();
