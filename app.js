@@ -143,6 +143,16 @@ const elements = {
   resultsToggle: document.getElementById("resultsToggle"),
   filtersPanel: document.getElementById("filtersPanel"),
   resultsPanel: document.getElementById("resultsPanel"),
+  favoritesPanel: document.getElementById("favoritesPanel"),
+  settingsPanel: document.getElementById("settingsPanel"),
+  favoritesList: document.getElementById("favoritesList"),
+  favoritesCount: document.getElementById("favoritesCount"),
+  favoritesEmpty: document.getElementById("favoritesEmpty"),
+  showPricesToggle: document.getElementById("showPricesToggle"),
+  autoOpenResultsToggle: document.getElementById("autoOpenResultsToggle"),
+  mapTab: document.querySelector('.tab-button[data-tab="map"]'),
+  favoritesTab: document.querySelector('.tab-button[data-tab="favorites"]'),
+  settingsTab: document.querySelector('.tab-button[data-tab="settings"]'),
 };
 
 const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
@@ -151,18 +161,34 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
+const favoriteIds = new Set();
 let activePanel = null;
 
 function updatePanels() {
   const isFiltersOpen = activePanel === "filters";
   const isResultsOpen = activePanel === "results";
+  const isFavoritesOpen = activePanel === "favorites";
+  const isSettingsOpen = activePanel === "settings";
+  const activeTab =
+    activePanel === "favorites"
+      ? "favorites"
+      : activePanel === "settings"
+        ? "settings"
+        : "map";
 
   elements.filtersPanel.classList.toggle("is-open", isFiltersOpen);
   elements.resultsPanel.classList.toggle("is-open", isResultsOpen);
+  elements.favoritesPanel.classList.toggle("is-open", isFavoritesOpen);
+  elements.settingsPanel.classList.toggle("is-open", isSettingsOpen);
   elements.filtersToggle.classList.toggle("active", isFiltersOpen);
   elements.resultsToggle.classList.toggle("active", isResultsOpen);
   elements.filtersPanel.setAttribute("aria-hidden", String(!isFiltersOpen));
   elements.resultsPanel.setAttribute("aria-hidden", String(!isResultsOpen));
+  elements.favoritesPanel.setAttribute("aria-hidden", String(!isFavoritesOpen));
+  elements.settingsPanel.setAttribute("aria-hidden", String(!isSettingsOpen));
+  elements.mapTab.classList.toggle("active", activeTab === "map");
+  elements.favoritesTab.classList.toggle("active", activeTab === "favorites");
+  elements.settingsTab.classList.toggle("active", activeTab === "settings");
 }
 
 function togglePanel(panel) {
@@ -252,6 +278,50 @@ function matchesFilters(contract, filters) {
   return true;
 }
 
+function toggleFavorite(contractId) {
+  if (favoriteIds.has(contractId)) {
+    favoriteIds.delete(contractId);
+  } else {
+    favoriteIds.add(contractId);
+  }
+  render();
+}
+
+function renderFavorites() {
+  const favorites = contractData.filter((contract) => favoriteIds.has(contract.id));
+  elements.favoritesList.innerHTML = "";
+
+  favorites.forEach((contract) => {
+    const card = document.createElement("article");
+    card.className = "card";
+    card.dataset.id = contract.id;
+    card.innerHTML = `
+      <div class="card-header">
+        <h3>${contract.title}</h3>
+        <span class="tag">${contract.source}</span>
+      </div>
+      <div class="card-details">
+        <div><span>Agency:</span> ${contract.agency}</div>
+        <div><span>Location:</span> ${contract.location}</div>
+        <div><span>Value:</span> ${formatValue(contract.value)}</div>
+      </div>
+      <div class="card-actions">
+        <div class="card-meta">${contract.category}</div>
+        <div class="action-buttons">
+          <button class="favorite-btn active" data-action="favorite" aria-pressed="true">
+            Remove
+          </button>
+          <button data-action="focus">View on map</button>
+        </div>
+      </div>
+    `;
+    elements.favoritesList.appendChild(card);
+  });
+
+  elements.favoritesCount.textContent = `${favorites.length} saved`;
+  elements.favoritesEmpty.classList.toggle("hidden", favorites.length > 0);
+}
+
 function sortResults(results, sortBy) {
   const sorted = [...results];
   switch (sortBy) {
@@ -314,6 +384,8 @@ function highlightCard(contractId) {
 function renderList(results) {
   elements.resultsList.innerHTML = "";
   results.forEach((contract) => {
+    const isFavorite = favoriteIds.has(contract.id);
+    const favoriteLabel = isFavorite ? "Saved" : "Save";
     const card = document.createElement("article");
     card.className = "card";
     card.dataset.id = contract.id;
@@ -330,7 +402,16 @@ function renderList(results) {
       </div>
       <div class="card-actions">
         <div class="card-meta">${contract.category}</div>
-        <button data-action="focus">View on map</button>
+        <div class="action-buttons">
+          <button
+            class="favorite-btn ${isFavorite ? "active" : ""}"
+            data-action="favorite"
+            aria-pressed="${isFavorite}"
+          >
+            ${favoriteLabel}
+          </button>
+          <button data-action="focus">View on map</button>
+        </div>
       </div>
     `;
     elements.resultsList.appendChild(card);
@@ -349,6 +430,16 @@ function renderMarkers(results) {
   });
 }
 
+function applyAutoOpenResults() {
+  if (!elements.autoOpenResultsToggle.checked) {
+    return;
+  }
+  if (activePanel === null) {
+    activePanel = "results";
+    updatePanels();
+  }
+}
+
 function updateCounts(count) {
   elements.resultsCount.textContent = `${count} open`;
   elements.emptyState.classList.toggle("hidden", count > 0);
@@ -362,10 +453,12 @@ function render() {
   renderList(results);
   renderMarkers(results);
   updateCounts(results.length);
+  renderFavorites();
+  applyAutoOpenResults();
 }
 
 elements.resultsList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-action='focus']");
+  const button = event.target.closest("[data-action]");
   if (!button) {
     return;
   }
@@ -376,11 +469,48 @@ elements.resultsList.addEventListener("click", (event) => {
   }
 
   const contractId = card.dataset.id;
-  const marker = markersById.get(contractId);
-  if (marker) {
-    map.setView(marker.getLatLng(), 10, { animate: true });
-    marker.openPopup();
-    highlightCard(contractId);
+  const action = button.dataset.action;
+
+  if (action === "favorite") {
+    toggleFavorite(contractId);
+    return;
+  }
+
+  if (action === "focus") {
+    const marker = markersById.get(contractId);
+    if (marker) {
+      map.setView(marker.getLatLng(), 10, { animate: true });
+      marker.openPopup();
+      highlightCard(contractId);
+    }
+  }
+});
+
+elements.favoritesList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    return;
+  }
+
+  const card = button.closest(".card");
+  if (!card) {
+    return;
+  }
+
+  const contractId = card.dataset.id;
+  const action = button.dataset.action;
+
+  if (action === "favorite") {
+    toggleFavorite(contractId);
+    return;
+  }
+
+  if (action === "focus") {
+    const marker = markersById.get(contractId);
+    if (marker) {
+      map.setView(marker.getLatLng(), 10, { animate: true });
+      marker.openPopup();
+    }
   }
 });
 
@@ -399,6 +529,21 @@ elements.resetFilters.addEventListener("click", () => {
 
 elements.filtersToggle.addEventListener("click", () => togglePanel("filters"));
 elements.resultsToggle.addEventListener("click", () => togglePanel("results"));
+elements.mapTab.addEventListener("click", () => {
+  activePanel = null;
+  updatePanels();
+});
+elements.favoritesTab.addEventListener("click", () => togglePanel("favorites"));
+elements.settingsTab.addEventListener("click", () => togglePanel("settings"));
+elements.showPricesToggle.addEventListener("change", () => {
+  document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
+});
+elements.autoOpenResultsToggle.addEventListener("change", () => {
+  if (elements.autoOpenResultsToggle.checked && activePanel === null) {
+    activePanel = "results";
+    updatePanels();
+  }
+});
 
 [
   elements.searchInput,
@@ -410,4 +555,6 @@ elements.resultsToggle.addEventListener("click", () => togglePanel("results"));
   ...document.querySelectorAll('input[name="source"]'),
 ].forEach((input) => input.addEventListener("input", render));
 
+document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
+updatePanels();
 render();

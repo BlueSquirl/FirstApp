@@ -106,10 +106,49 @@
             </section>
           </aside>
 
+          <aside id="favoritesPanel" class="slide-panel" aria-hidden="true">
+            <section class="panel favorites-panel">
+              <div class="results-header">
+                <h2>Favorites</h2>
+                <span id="favoritesCount">0</span>
+              </div>
+              <div id="favoritesList" class="results-list"></div>
+              <p id="favoritesEmpty" class="panel-empty hidden">
+                No favorites yet. Save an opportunity to revisit it here.
+              </p>
+            </section>
+          </aside>
+
+          <aside id="settingsPanel" class="slide-panel" aria-hidden="true">
+            <section class="panel settings-panel">
+              <h2>Settings</h2>
+              <label class="checkbox toggle">
+                <input id="showPricesToggle" type="checkbox" checked />
+                Show price labels on map
+              </label>
+              <label class="checkbox toggle">
+                <input id="autoOpenResultsToggle" type="checkbox" />
+                Auto-open opportunities panel
+              </label>
+            </section>
+          </aside>
+
           <div id="emptyState" class="empty-state hidden">
             No opportunities match your filters. Try widening the value range or
             clearing the date filter.
           </div>
+
+          <nav class="bottom-tabs" aria-label="Primary">
+            <button class="tab-button active" type="button" data-tab="map">
+              Map
+            </button>
+            <button class="tab-button" type="button" data-tab="favorites">
+              Favorites
+            </button>
+            <button class="tab-button" type="button" data-tab="settings">
+              Settings
+            </button>
+          </nav>
         </main>
       </div>
     </div>
