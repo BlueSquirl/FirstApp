@@ -465,8 +465,12 @@ function highlightCard(contractId) {
     card.classList.toggle("active", card.dataset.id === contractId);
   });
   const activeCard = elements.resultsList.querySelector(`[data-id="${contractId}"]`);
-  if (activeCard) {
-    activeCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (activeCard && elements.resultsPanel.classList.contains("is-open")) {
+    activeCard.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
   }
 }
 
