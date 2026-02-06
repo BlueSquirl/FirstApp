@@ -266,7 +266,7 @@ button.secondary {
   position: relative;
   border: 1px solid #e0e6ef;
   border-radius: 12px;
-  padding: 16px;
+  padding: 16px 16px 20px;
   background: #fdfdff;
   display: flex;
   flex-direction: column;
@@ -408,6 +408,16 @@ button.secondary {
 
 .leaflet-popup {
   z-index: 700;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+}
+
+.leaflet-popup-content {
+  margin: 6px 10px;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .map-controls {
