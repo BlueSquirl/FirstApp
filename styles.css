@@ -2,6 +2,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -20,7 +25,7 @@ p {
 }
 
 .app {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -89,6 +94,7 @@ button.secondary {
 
 .content {
   flex: 1;
+  display: flex;
   min-height: 0;
 }
 
@@ -235,6 +241,7 @@ button.secondary {
 
 .map-pane {
   position: relative;
+  flex: 1;
   height: 100%;
   min-height: 0;
 }
@@ -242,6 +249,7 @@ button.secondary {
 #map {
   height: 100%;
   width: 100%;
+  min-height: 320px;
 }
 
 .map-controls {
