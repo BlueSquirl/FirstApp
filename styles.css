@@ -264,15 +264,30 @@ button.secondary {
 }
 
 .favorite-btn {
-  background: #eef2fb;
+  background: #fffdf4;
   color: #1e2b5c;
-  border: 1px solid #d3dced;
+  border: 1px solid #f3dea0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .favorite-btn.active {
-  background: #1e2b5c;
-  border-color: #1e2b5c;
-  color: #ffffff;
+  background: #fff4c2;
+  border-color: #f3c94b;
+  color: #1e2b5c;
+}
+
+.star-icon {
+  width: 16px;
+  height: 16px;
+  stroke: #f3c94b;
+  stroke-width: 1.6;
+  fill: transparent;
+}
+
+.favorite-btn.active .star-icon {
+  fill: #f3c94b;
 }
 
 .map-pane {
