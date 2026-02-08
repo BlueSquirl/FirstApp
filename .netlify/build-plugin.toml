@@ -1,0 +1,5 @@
+[[plugins]]
+package = "@netlify/plugin-lighthouse"
+
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = "firebase-config.js"
