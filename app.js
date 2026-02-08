@@ -167,6 +167,8 @@ const elements = {
   favoritesLocked: document.getElementById("favoritesLocked"),
   favoritesUpgradeBtn: document.getElementById("favoritesUpgradeBtn"),
   favoritesBadge: document.getElementById("favoritesBadge"),
+  closeResultsBtn: document.getElementById("closeResultsBtn"),
+  closeFiltersBtn: document.getElementById("closeFiltersBtn"),
   showPricesToggle: document.getElementById("showPricesToggle"),
   autoOpenResultsToggle: document.getElementById("autoOpenResultsToggle"),
   mapTab: document.querySelector('.tab-button[data-tab="map"]'),
@@ -734,6 +736,8 @@ elements.resetFilters.addEventListener("click", () => {
 
 elements.filtersToggle.addEventListener("click", () => togglePanel("filters"));
 elements.resultsToggle.addEventListener("click", () => togglePanel("results"));
+elements.closeResultsBtn.addEventListener("click", () => togglePanel("results"));
+elements.closeFiltersBtn.addEventListener("click", () => togglePanel("filters"));
 elements.mapTab.addEventListener("click", () => {
   activePanel = null;
   updatePanels();

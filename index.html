@@ -31,7 +31,19 @@
           <div id="map"></div>
           <aside id="filtersPanel" class="slide-panel" aria-hidden="true">
             <section class="panel filters-panel">
-              <h2>Filters</h2>
+              <div class="results-header">
+                <h2>Filters</h2>
+                <div class="header-actions">
+                  <button
+                    id="closeFiltersBtn"
+                    class="close-panel-btn"
+                    type="button"
+                    aria-label="Close filters panel"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
               <label class="field">
                 Search by keyword or agency
                 <input id="searchInput" type="text" placeholder="Bridge, sewer, DOT District 4" />
@@ -100,7 +112,17 @@
             <section class="panel results-panel">
               <div class="results-header">
                 <h2>Opportunities</h2>
-                <span id="resultsCount">0</span>
+                <div class="header-actions">
+                  <span id="resultsCount">0</span>
+                  <button
+                    id="closeResultsBtn"
+                    class="close-panel-btn"
+                    type="button"
+                    aria-label="Close opportunities panel"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
               <div id="loadingState" class="loading-state hidden">Loading opportunities...</div>
               <div id="errorState" class="error-state hidden">
