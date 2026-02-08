@@ -169,6 +169,8 @@ const elements = {
   favoritesBadge: document.getElementById("favoritesBadge"),
   closeResultsBtn: document.getElementById("closeResultsBtn"),
   closeFiltersBtn: document.getElementById("closeFiltersBtn"),
+  fontSizeSlider: document.getElementById("fontSizeSlider"),
+  fontSizeValue: document.getElementById("fontSizeValue"),
   showPricesToggle: document.getElementById("showPricesToggle"),
   autoOpenResultsToggle: document.getElementById("autoOpenResultsToggle"),
   mapTab: document.querySelector('.tab-button[data-tab="map"]'),
@@ -667,6 +669,19 @@ function renderContracts() {
   render();
 }
 
+function applyFontSize(size) {
+  const labels = {
+    12: "Small",
+    14: "Medium",
+    16: "Large",
+    18: "X-Large",
+    20: "XX-Large",
+  };
+  elements.fontSizeValue.textContent = labels[size] || "Medium";
+  document.documentElement.style.setProperty("--base-font-size", `${size}px`);
+  document.body.style.fontSize = `${size}px`;
+}
+
 function render() {
   refreshFavoriteIds();
   const filters = getFilters();
@@ -752,6 +767,16 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
     activePanel = "results";
     updatePanels();
   }
+});
+
+const savedFontSize = localStorage.getItem("fontSizePreference") || "14";
+elements.fontSizeSlider.value = savedFontSize;
+applyFontSize(savedFontSize);
+
+elements.fontSizeSlider.addEventListener("input", (event) => {
+  const size = event.target.value;
+  applyFontSize(size);
+  localStorage.setItem("fontSizePreference", size);
 });
 
 elements.favoritesUpgradeBtn.addEventListener("click", () => Auth.openUpgradeModal());
