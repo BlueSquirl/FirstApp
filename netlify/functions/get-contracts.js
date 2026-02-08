@@ -7,7 +7,10 @@ const STATE_CENTERS = {
 };
 
 function formatDate(date) {
-  return date.toISOString().split("T")[0];
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
 }
 
 function parseAmount(amount) {
@@ -118,6 +121,7 @@ exports.handler = async (event) => {
     const postedTo = new Date();
     const postedFrom = new Date();
     postedFrom.setDate(postedTo.getDate() - 90);
+    console.log("Date range:", formatDate(postedFrom), "to", formatDate(postedTo));
 
     const apiParams = new URLSearchParams({
       api_key: apiKey,
