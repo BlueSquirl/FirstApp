@@ -253,6 +253,27 @@ button.secondary {
   color: #3f4b64;
 }
 
+.loading-state {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #eef2fb;
+  color: #3f4b64;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.error-state {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff0f0;
+  border: 1px solid #f9c5c5;
+  color: #8a1f1f;
+  font-size: 12px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .results-list {
   display: flex;
   flex-direction: column;
@@ -294,6 +315,14 @@ button.secondary {
   align-items: flex-start;
 }
 
+.card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
 .tag {
   background: #e8f0ff;
   color: #1e4bd1;
@@ -313,7 +342,9 @@ button.secondary {
   overflow-wrap: anywhere;
   word-break: break-word;
   line-height: 1.4;
-  margin-bottom: 8px;
+  margin: 0;
+  min-width: 0;
+  flex: 1;
 }
 
 .card-details {
@@ -347,6 +378,14 @@ button.secondary {
   max-width: 100%;
 }
 
+.card {
+  cursor: pointer;
+}
+
+.favorite-btn {
+  cursor: pointer;
+}
+
 .action-buttons {
   display: flex;
   align-items: center;
@@ -376,10 +415,30 @@ button.secondary {
   gap: 6px;
 }
 
+.favorite-btn.icon-only {
+  padding: 4px;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+  background: transparent;
+  border-color: transparent;
+}
+
+.favorite-btn.icon-only .star-icon {
+  width: 14px;
+  height: 14px;
+}
+
 .favorite-btn.active {
   background: #fff4c2;
   border-color: #f3c94b;
   color: #1e2b5c;
+}
+
+.favorite-btn.icon-only.active {
+  background: transparent;
+  border-color: transparent;
 }
 
 .star-icon {

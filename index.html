@@ -102,6 +102,11 @@
                 <h2>Opportunities</h2>
                 <span id="resultsCount">0</span>
               </div>
+              <div id="loadingState" class="loading-state hidden">Loading opportunities...</div>
+              <div id="errorState" class="error-state hidden">
+                <p id="errorMessage">Unable to load opportunities.</p>
+                <button id="retryLoad" class="outline" type="button">Retry</button>
+              </div>
               <div id="resultsList" class="results-list"></div>
             </section>
           </aside>

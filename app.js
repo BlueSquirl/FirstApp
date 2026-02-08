@@ -1,4 +1,4 @@
-const contractData = [
+const mockContractData = [
   {
     id: "c1",
     title: "I-75 Resurfacing and Bridge Repair",
@@ -11,7 +11,7 @@ const contractData = [
     value: 12400000,
     dueDate: "2026-03-15",
     postedDate: "2026-02-01",
-    contact: "bid@dot.ohio.gov",
+    contactEmail: "bid@dot.ohio.gov",
     url: "https://www.transportation.ohio.gov/",
   },
   {
@@ -26,7 +26,7 @@ const contractData = [
     value: 8200000,
     dueDate: "2026-02-28",
     postedDate: "2026-01-25",
-    contact: "procurement@dmww.com",
+    contactEmail: "procurement@dmww.com",
     url: "https://www.dmww.com/",
   },
   {
@@ -41,7 +41,7 @@ const contractData = [
     value: 5100000,
     dueDate: "2026-03-08",
     postedDate: "2026-01-30",
-    contact: "bids@raleighnc.gov",
+    contactEmail: "bids@raleighnc.gov",
     url: "https://raleighnc.gov/",
   },
   {
@@ -56,7 +56,7 @@ const contractData = [
     value: 3400000,
     dueDate: "2026-04-02",
     postedDate: "2026-02-02",
-    contact: "contracting@flyboise.com",
+    contactEmail: "contracting@flyboise.com",
     url: "https://sam.gov/",
   },
   {
@@ -71,7 +71,7 @@ const contractData = [
     value: 2200000,
     dueDate: "2026-03-21",
     postedDate: "2026-02-01",
-    contact: "bids@valleymetro.org",
+    contactEmail: "bids@valleymetro.org",
     url: "https://www.valleymetro.org/",
   },
   {
@@ -86,7 +86,7 @@ const contractData = [
     value: 4800000,
     dueDate: "2026-03-12",
     postedDate: "2026-01-27",
-    contact: "purchasing@larimer.org",
+    contactEmail: "purchasing@larimer.org",
     url: "https://www.larimer.gov/",
   },
   {
@@ -101,7 +101,7 @@ const contractData = [
     value: 6500000,
     dueDate: "2026-04-10",
     postedDate: "2026-02-03",
-    contact: "contracts@georgiaports.com",
+    contactEmail: "contracts@georgiaports.com",
     url: "https://sam.gov/",
   },
   {
@@ -116,10 +116,12 @@ const contractData = [
     value: 1600000,
     dueDate: "2026-03-05",
     postedDate: "2026-01-22",
-    contact: "facilities@newark.k12.nj.us",
+    contactEmail: "facilities@newark.k12.nj.us",
     url: "https://www.nps.k12.nj.us/",
   },
 ];
+
+let contractData = [...mockContractData];
 
 const allSources = ["CivCast", "Bonfire", "SAM.gov"];
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -138,6 +140,10 @@ const elements = {
   resetFilters: document.getElementById("resetFilters"),
   resultsList: document.getElementById("resultsList"),
   resultsCount: document.getElementById("resultsCount"),
+  loadingState: document.getElementById("loadingState"),
+  errorState: document.getElementById("errorState"),
+  errorMessage: document.getElementById("errorMessage"),
+  retryLoad: document.getElementById("retryLoad"),
   emptyState: document.getElementById("emptyState"),
   filtersToggle: document.getElementById("filtersToggle"),
   resultsToggle: document.getElementById("resultsToggle"),
@@ -204,26 +210,48 @@ function togglePanel(panel) {
 }
 
 function formatValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "N/A";
+  }
+  if (typeof value === "string") {
+    const sanitized = value.replace(/[^0-9.]/g, "");
+    const numeric = Number(sanitized);
+    if (Number.isFinite(numeric)) {
+      return currencyFormatter.format(numeric);
+    }
+    return value;
+  }
+  if (!Number.isFinite(value)) {
+    return "N/A";
+  }
   return currencyFormatter.format(value);
 }
 
 function formatShortValue(value) {
-  if (value >= 1_000_000_000) {
-    const compact = value / 1_000_000_000;
+  let numeric = value;
+  if (typeof value === "string") {
+    numeric = Number(value.replace(/[^0-9.]/g, ""));
+  }
+  if (!Number.isFinite(numeric)) {
+    return "--";
+  }
+  const amount = numeric;
+  if (amount >= 1_000_000_000) {
+    const compact = amount / 1_000_000_000;
     const digits = compact >= 100 ? 0 : 1;
     return `$${compact.toFixed(digits)}B`;
   }
-  if (value >= 1_000_000) {
-    const compact = value / 1_000_000;
+  if (amount >= 1_000_000) {
+    const compact = amount / 1_000_000;
     const digits = compact >= 100 ? 0 : 1;
     return `$${compact.toFixed(digits)}M`;
   }
-  if (value >= 1_000) {
-    const compact = value / 1_000;
+  if (amount >= 1_000) {
+    const compact = amount / 1_000;
     const digits = compact >= 100 ? 0 : 1;
     return `$${compact.toFixed(digits)}K`;
   }
-  return `$${value.toLocaleString("en-US")}`;
+  return `$${amount.toLocaleString("en-US")}`;
 }
 
 function formatDate(isoDate) {
@@ -235,20 +263,21 @@ function formatDate(isoDate) {
   });
 }
 
-function favoriteButtonHTML(isFavorite, label = "Add to Favorites") {
+function favoriteButtonHTML(isFavorite, label = "Add to favorites") {
   return `
     <button
-      class="favorite-btn ${isFavorite ? "active" : ""}"
+      class="favorite-btn icon-only ${isFavorite ? "active" : ""}"
       data-action="favorite"
       type="button"
       aria-pressed="${isFavorite}"
+      aria-label="${label}"
+      title="${label}"
     >
       <svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path
           d="M12 3.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.48L12 18.98l-5.8 3.4 1.11-6.48-4.7-4.58 6.49-.94L12 3.5z"
         />
       </svg>
-      ${label}
     </button>
   `;
 }
@@ -266,6 +295,13 @@ function favoriteIndicatorHTML(isFavorite) {
       </svg>
     </span>
   `;
+}
+
+function truncateTitle(title, maxLength = 30) {
+  if (!title || title.length <= maxLength) {
+    return title;
+  }
+  return `${title.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
 function getCurrentUserId() {
@@ -287,6 +323,50 @@ function updateFavoritesBadge() {
   const count = userId ? Favorites.getFavorites(userId).length : 0;
   elements.favoritesBadge.textContent = count;
   elements.favoritesBadge.classList.remove("hidden");
+}
+
+function showLoadingState() {
+  elements.loadingState.classList.remove("hidden");
+}
+
+function hideLoadingState() {
+  elements.loadingState.classList.add("hidden");
+}
+
+function showErrorState(message) {
+  elements.errorMessage.textContent = message;
+  elements.errorState.classList.remove("hidden");
+}
+
+function hideErrorState() {
+  elements.errorState.classList.add("hidden");
+}
+
+async function loadContracts() {
+  showLoadingState();
+  hideErrorState();
+
+  try {
+    const response = await fetch("/.netlify/functions/get-contracts?state=TX");
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error || "Unable to load opportunities.");
+    }
+
+    if (!Array.isArray(data.opportunities)) {
+      throw new Error("Unexpected data format from SAM.gov.");
+    }
+
+    contractData = data.opportunities;
+  } catch (error) {
+    console.error("Failed to fetch contracts:", error);
+    contractData = [...mockContractData];
+    showErrorState("Unable to load live contracts. Showing sample data.");
+  } finally {
+    hideLoadingState();
+    render();
+  }
 }
 
 function getFilters() {
@@ -371,12 +451,16 @@ function renderFavorites() {
 
   favorites.forEach((contract) => {
     const isFavorite = favoriteIdsForUser.includes(contract.id);
+    const truncatedTitle = truncateTitle(contract.title);
     const card = document.createElement("article");
     card.className = "card";
     card.dataset.id = contract.id;
     card.innerHTML = `
       <div class="card-header">
-        <h3>${contract.title}</h3>
+        <div class="card-title-row">
+          ${favoriteButtonHTML(true, "Remove from favorites")}
+          <h3 title="${contract.title}">${truncatedTitle}</h3>
+        </div>
         <span class="tag">${contract.source}</span>
       </div>
       <div class="card-details">
@@ -386,10 +470,6 @@ function renderFavorites() {
       </div>
       <div class="card-actions">
         <div class="card-meta">${contract.category}</div>
-        <div class="action-buttons">
-          ${favoriteButtonHTML(true, "Favorited")}
-          <button data-action="focus">View on map</button>
-        </div>
       </div>
     `;
     elements.favoritesList.appendChild(card);
@@ -434,9 +514,10 @@ function createPriceIcon(value) {
 }
 
 function createPopupContent(contract, isLocked) {
+  const contactEmail = contract.contactEmail || contract.contact;
   const contactLine = isLocked
     ? "<span>Contact:</span> 🔒 Premium only<br />"
-    : `<span>Contact:</span> ${contract.contact}<br />`;
+    : `<span>Contact:</span> ${contactEmail || "Not listed"}<br />`;
   return `
     <div class="popup">
       <strong>${contract.title}</strong><br />
@@ -470,7 +551,8 @@ function renderList(results) {
   results.forEach((contract, index) => {
     const isFavorite = favoriteIds.has(contract.id);
     const locked = isJobLocked(index, isPremium);
-    const favoriteLabel = isFavorite ? "Favorited" : "Add to Favorites";
+    const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
+    const truncatedTitle = truncateTitle(contract.title);
     const card = document.createElement("article");
     card.className = locked ? "card locked" : "card";
     card.dataset.id = contract.id;
@@ -491,28 +573,19 @@ function renderList(results) {
           <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
         </div>
       `;
-    const actionsMarkup = locked
-      ? `
-        <div class="card-actions locked-content" aria-hidden="true">
+    const actionsMarkup = `
+        <div class="card-actions ${locked ? "locked-content" : ""}" aria-hidden="${
+      locked ? "true" : "false"
+    }">
           <div class="card-meta">${contract.category}</div>
-          <div class="action-buttons">
-            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
-            <button data-action="focus">View on map</button>
-          </div>
-        </div>
-      `
-      : `
-        <div class="card-actions">
-          <div class="card-meta">${contract.category}</div>
-          <div class="action-buttons">
-            ${favoriteButtonHTML(isFavorite, favoriteLabel)}
-            <button data-action="focus">View on map</button>
-          </div>
         </div>
       `;
     card.innerHTML = `
       <div class="card-header">
-        <h3>${contract.title}</h3>
+        <div class="card-title-row">
+          ${favoriteButtonHTML(isFavorite, favoriteLabel)}
+          <h3 title="${contract.title}">${truncatedTitle}</h3>
+        </div>
         <span class="tag">${contract.source}</span>
       </div>
       ${detailsMarkup}
@@ -535,6 +608,9 @@ function renderList(results) {
 function renderMarkers(results) {
   clearMarkers();
   results.forEach((contract) => {
+    if (!Number.isFinite(contract.lat) || !Number.isFinite(contract.lng)) {
+      return;
+    }
     const marker = L.marker([contract.lat, contract.lng], {
       icon: createPriceIcon(contract.value),
     }).addTo(markersLayer);
@@ -542,6 +618,15 @@ function renderMarkers(results) {
     marker.on("click", () => highlightCard(contract.id));
     markersById.set(contract.id, marker);
   });
+}
+
+function focusOnContract(contractId) {
+  highlightCard(contractId);
+  const marker = markersById.get(contractId);
+  if (marker) {
+    map.setView(marker.getLatLng(), 10, { animate: true });
+    marker.openPopup();
+  }
 }
 
 function applyAutoOpenResults() {
@@ -585,58 +670,32 @@ elements.resultsList.addEventListener("click", (event) => {
     return;
   }
 
-  const button = event.target.closest("[data-action]");
-  if (!button) {
-    return;
-  }
-
   const contractId = card.dataset.id;
-  const action = button.dataset.action;
-
-  if (action === "favorite") {
+  const button = event.target.closest("[data-action]");
+  if (button && button.dataset.action === "favorite") {
     toggleFavorite(contractId);
     return;
   }
-
-  if (action === "focus") {
-    const marker = markersById.get(contractId);
-    if (marker) {
-      map.setView(marker.getLatLng(), 10, { animate: true });
-      marker.openPopup();
-      highlightCard(contractId);
-    }
-  }
+  focusOnContract(contractId);
 });
 
 elements.favoritesList.addEventListener("click", (event) => {
   if (!Auth.requirePremium()) {
     return;
   }
-  const button = event.target.closest("[data-action]");
-  if (!button) {
-    return;
-  }
 
-  const card = button.closest(".card");
+  const card = event.target.closest(".card");
   if (!card) {
     return;
   }
 
   const contractId = card.dataset.id;
-  const action = button.dataset.action;
-
-  if (action === "favorite") {
+  const button = event.target.closest("[data-action]");
+  if (button && button.dataset.action === "favorite") {
     toggleFavorite(contractId);
     return;
   }
-
-  if (action === "focus") {
-    const marker = markersById.get(contractId);
-    if (marker) {
-      map.setView(marker.getLatLng(), 10, { animate: true });
-      marker.openPopup();
-    }
-  }
+  focusOnContract(contractId);
 });
 
 elements.resetFilters.addEventListener("click", () => {
@@ -671,6 +730,7 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
 });
 
 elements.favoritesUpgradeBtn.addEventListener("click", () => Auth.openUpgradeModal());
+elements.retryLoad.addEventListener("click", () => loadContracts());
 Auth.onAuthChange(() => {
   render();
 });
@@ -691,4 +751,4 @@ Favorites.onChange(() => {
 document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
 Auth.initAuth();
 updatePanels();
-render();
+loadContracts();
