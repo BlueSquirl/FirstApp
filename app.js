@@ -1,4 +1,4 @@
-const contractData = [
+const mockContractData = [
   {
     id: "c1",
     title: "I-75 Resurfacing and Bridge Repair",
@@ -11,7 +11,7 @@ const contractData = [
     value: 12400000,
     dueDate: "2026-03-15",
     postedDate: "2026-02-01",
-    contact: "bid@dot.ohio.gov",
+    contactEmail: "bid@dot.ohio.gov",
     url: "https://www.transportation.ohio.gov/",
   },
   {
@@ -26,7 +26,7 @@ const contractData = [
     value: 8200000,
     dueDate: "2026-02-28",
     postedDate: "2026-01-25",
-    contact: "procurement@dmww.com",
+    contactEmail: "procurement@dmww.com",
     url: "https://www.dmww.com/",
   },
   {
@@ -41,7 +41,7 @@ const contractData = [
     value: 5100000,
     dueDate: "2026-03-08",
     postedDate: "2026-01-30",
-    contact: "bids@raleighnc.gov",
+    contactEmail: "bids@raleighnc.gov",
     url: "https://raleighnc.gov/",
   },
   {
@@ -56,7 +56,7 @@ const contractData = [
     value: 3400000,
     dueDate: "2026-04-02",
     postedDate: "2026-02-02",
-    contact: "contracting@flyboise.com",
+    contactEmail: "contracting@flyboise.com",
     url: "https://sam.gov/",
   },
   {
@@ -71,7 +71,7 @@ const contractData = [
     value: 2200000,
     dueDate: "2026-03-21",
     postedDate: "2026-02-01",
-    contact: "bids@valleymetro.org",
+    contactEmail: "bids@valleymetro.org",
     url: "https://www.valleymetro.org/",
   },
   {
@@ -86,7 +86,7 @@ const contractData = [
     value: 4800000,
     dueDate: "2026-03-12",
     postedDate: "2026-01-27",
-    contact: "purchasing@larimer.org",
+    contactEmail: "purchasing@larimer.org",
     url: "https://www.larimer.gov/",
   },
   {
@@ -101,7 +101,7 @@ const contractData = [
     value: 6500000,
     dueDate: "2026-04-10",
     postedDate: "2026-02-03",
-    contact: "contracts@georgiaports.com",
+    contactEmail: "contracts@georgiaports.com",
     url: "https://sam.gov/",
   },
   {
@@ -116,10 +116,12 @@ const contractData = [
     value: 1600000,
     dueDate: "2026-03-05",
     postedDate: "2026-01-22",
-    contact: "facilities@newark.k12.nj.us",
+    contactEmail: "facilities@newark.k12.nj.us",
     url: "https://www.nps.k12.nj.us/",
   },
 ];
+
+let contractData = [...mockContractData];
 
 const allSources = ["CivCast", "Bonfire", "SAM.gov"];
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -138,6 +140,10 @@ const elements = {
   resetFilters: document.getElementById("resetFilters"),
   resultsList: document.getElementById("resultsList"),
   resultsCount: document.getElementById("resultsCount"),
+  loadingState: document.getElementById("loadingState"),
+  errorState: document.getElementById("errorState"),
+  errorMessage: document.getElementById("errorMessage"),
+  retryLoad: document.getElementById("retryLoad"),
   emptyState: document.getElementById("emptyState"),
   filtersToggle: document.getElementById("filtersToggle"),
   resultsToggle: document.getElementById("resultsToggle"),
@@ -204,26 +210,48 @@ function togglePanel(panel) {
 }
 
 function formatValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "N/A";
+  }
+  if (typeof value === "string") {
+    const sanitized = value.replace(/[^0-9.]/g, "");
+    const numeric = Number(sanitized);
+    if (Number.isFinite(numeric)) {
+      return currencyFormatter.format(numeric);
+    }
+    return value;
+  }
+  if (!Number.isFinite(value)) {
+    return "N/A";
+  }
   return currencyFormatter.format(value);
 }
 
 function formatShortValue(value) {
-  if (value >= 1_000_000_000) {
-    const compact = value / 1_000_000_000;
+  let numeric = value;
+  if (typeof value === "string") {
+    numeric = Number(value.replace(/[^0-9.]/g, ""));
+  }
+  if (!Number.isFinite(numeric)) {
+    return "--";
+  }
+  const amount = numeric;
+  if (amount >= 1_000_000_000) {
+    const compact = amount / 1_000_000_000;
     const digits = compact >= 100 ? 0 : 1;
     return `$${compact.toFixed(digits)}B`;
   }
-  if (value >= 1_000_000) {
-    const compact = value / 1_000_000;
+  if (amount >= 1_000_000) {
+    const compact = amount / 1_000_000;
     const digits = compact >= 100 ? 0 : 1;
     return `$${compact.toFixed(digits)}M`;
   }
-  if (value >= 1_000) {
-    const compact = value / 1_000;
+  if (amount >= 1_000) {
+    const compact = amount / 1_000;
     const digits = compact >= 100 ? 0 : 1;
     return `$${compact.toFixed(digits)}K`;
   }
-  return `$${value.toLocaleString("en-US")}`;
+  return `$${amount.toLocaleString("en-US")}`;
 }
 
 function formatDate(isoDate) {
@@ -295,6 +323,50 @@ function updateFavoritesBadge() {
   const count = userId ? Favorites.getFavorites(userId).length : 0;
   elements.favoritesBadge.textContent = count;
   elements.favoritesBadge.classList.remove("hidden");
+}
+
+function showLoadingState() {
+  elements.loadingState.classList.remove("hidden");
+}
+
+function hideLoadingState() {
+  elements.loadingState.classList.add("hidden");
+}
+
+function showErrorState(message) {
+  elements.errorMessage.textContent = message;
+  elements.errorState.classList.remove("hidden");
+}
+
+function hideErrorState() {
+  elements.errorState.classList.add("hidden");
+}
+
+async function loadContracts() {
+  showLoadingState();
+  hideErrorState();
+
+  try {
+    const response = await fetch("/.netlify/functions/get-contracts?state=TX");
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error || "Unable to load opportunities.");
+    }
+
+    if (!Array.isArray(data.opportunities)) {
+      throw new Error("Unexpected data format from SAM.gov.");
+    }
+
+    contractData = data.opportunities;
+  } catch (error) {
+    console.error("Failed to fetch contracts:", error);
+    contractData = [...mockContractData];
+    showErrorState("Unable to load live contracts. Showing sample data.");
+  } finally {
+    hideLoadingState();
+    render();
+  }
 }
 
 function getFilters() {
@@ -442,9 +514,10 @@ function createPriceIcon(value) {
 }
 
 function createPopupContent(contract, isLocked) {
+  const contactEmail = contract.contactEmail || contract.contact;
   const contactLine = isLocked
     ? "<span>Contact:</span> 🔒 Premium only<br />"
-    : `<span>Contact:</span> ${contract.contact}<br />`;
+    : `<span>Contact:</span> ${contactEmail || "Not listed"}<br />`;
   return `
     <div class="popup">
       <strong>${contract.title}</strong><br />
@@ -535,6 +608,9 @@ function renderList(results) {
 function renderMarkers(results) {
   clearMarkers();
   results.forEach((contract) => {
+    if (!Number.isFinite(contract.lat) || !Number.isFinite(contract.lng)) {
+      return;
+    }
     const marker = L.marker([contract.lat, contract.lng], {
       icon: createPriceIcon(contract.value),
     }).addTo(markersLayer);
@@ -545,11 +621,11 @@ function renderMarkers(results) {
 }
 
 function focusOnContract(contractId) {
+  highlightCard(contractId);
   const marker = markersById.get(contractId);
   if (marker) {
     map.setView(marker.getLatLng(), 10, { animate: true });
     marker.openPopup();
-    highlightCard(contractId);
   }
 }
 
@@ -654,6 +730,7 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
 });
 
 elements.favoritesUpgradeBtn.addEventListener("click", () => Auth.openUpgradeModal());
+elements.retryLoad.addEventListener("click", () => loadContracts());
 Auth.onAuthChange(() => {
   render();
 });
@@ -674,4 +751,4 @@ Favorites.onChange(() => {
 document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
 Auth.initAuth();
 updatePanels();
-render();
+loadContracts();

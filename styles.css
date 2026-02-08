@@ -253,6 +253,27 @@ button.secondary {
   color: #3f4b64;
 }
 
+.loading-state {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #eef2fb;
+  color: #3f4b64;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.error-state {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff0f0;
+  border: 1px solid #f9c5c5;
+  color: #8a1f1f;
+  font-size: 12px;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .results-list {
   display: flex;
   flex-direction: column;
