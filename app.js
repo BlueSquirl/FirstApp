@@ -519,12 +519,15 @@ function clearMarkers() {
   markersById.clear();
 }
 
-function createPriceIcon(value) {
+function createPriceIcon(value, isFavorite) {
+  const starMarkup = isFavorite
+    ? '<span class="pin-star" aria-hidden="true">★</span>'
+    : "";
   return L.divIcon({
     className: "price-pin",
     html: `
       <div class="pin-label">
-        <span class="pin-star" aria-hidden="true">★</span>
+        ${starMarkup}
         <span class="pin-amount">${formatShortValue(value)}</span>
       </div>
     `,
@@ -632,8 +635,9 @@ function renderMarkers(results) {
     if (!Number.isFinite(contract.lat) || !Number.isFinite(contract.lng)) {
       return;
     }
+    const isFavorite = favoriteIds.has(contract.id);
     const marker = L.marker([contract.lat, contract.lng], {
-      icon: createPriceIcon(contract.value),
+      icon: createPriceIcon(contract.value, isFavorite),
     }).addTo(markersLayer);
     marker.bindPopup(createPopupContent(contract, lockedJobIds.has(contract.id)));
     marker.on("click", () => highlightCard(contract.id));
