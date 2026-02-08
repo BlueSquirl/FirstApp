@@ -1,3 +1,13 @@
+import { db } from "./firebase-config.js";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const { Auth, Favorites } = window;
+
 const mockContractData = [
   {
     id: "c1",
@@ -343,29 +353,46 @@ function hideErrorState() {
 }
 
 async function loadContracts() {
+  console.log("Loading contracts from Firestore...");
   showLoadingState();
   hideErrorState();
 
   try {
-    const response = await fetch("/.netlify/functions/get-contracts?state=TX");
-    const data = await response.json();
+    const contractsRef = collection(db, "contracts");
+    const contractsQuery = query(contractsRef, orderBy("postedDate", "desc"));
+    const querySnapshot = await getDocs(contractsQuery);
 
-    if (!response.ok || data.error) {
-      throw new Error(data.error || "Unable to load opportunities.");
+    contractData = querySnapshot.docs.map((doc) => doc.data());
+
+    console.log(`Loaded ${contractData.length} contracts from Firestore cache`);
+
+    try {
+      const metadataSnapshot = await getDocs(collection(db, "metadata"));
+      metadataSnapshot.forEach((doc) => {
+        if (doc.id === "lastRefresh") {
+          const data = doc.data();
+          const lastUpdate = data.timestamp?.toDate();
+          console.log("Data last refreshed:", lastUpdate);
+        }
+      });
+    } catch (e) {
+      console.log("No metadata available yet");
     }
 
-    if (!Array.isArray(data.opportunities)) {
-      throw new Error("Unexpected data format from SAM.gov.");
+    if (contractData.length === 0) {
+      console.log("No contracts in Firestore, using mock data");
+      contractData = [...mockContractData];
     }
 
-    contractData = data.opportunities;
+    renderContracts();
   } catch (error) {
-    console.error("Failed to fetch contracts:", error);
+    console.error("Failed to load contracts from Firestore:", error);
+    console.log("Falling back to mock data");
     contractData = [...mockContractData];
     showErrorState("Unable to load live contracts. Showing sample data.");
+    renderContracts();
   } finally {
     hideLoadingState();
-    render();
   }
 }
 
@@ -642,6 +669,10 @@ function applyAutoOpenResults() {
 function updateCounts(count) {
   elements.resultsCount.textContent = `${count} open`;
   elements.emptyState.classList.toggle("hidden", count > 0);
+}
+
+function renderContracts() {
+  render();
 }
 
 function render() {
