@@ -31,7 +31,19 @@
           <div id="map"></div>
           <aside id="filtersPanel" class="slide-panel" aria-hidden="true">
             <section class="panel filters-panel">
-              <h2>Filters</h2>
+              <div class="results-header">
+                <h2>Filters</h2>
+                <div class="header-actions">
+                  <button
+                    id="closeFiltersBtn"
+                    class="close-panel-btn"
+                    type="button"
+                    aria-label="Close filters panel"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </div>
               <label class="field">
                 Search by keyword or agency
                 <input id="searchInput" type="text" placeholder="Bridge, sewer, DOT District 4" />
@@ -100,7 +112,17 @@
             <section class="panel results-panel">
               <div class="results-header">
                 <h2>Opportunities</h2>
-                <span id="resultsCount">0</span>
+                <div class="header-actions">
+                  <span id="resultsCount">0</span>
+                  <button
+                    id="closeResultsBtn"
+                    class="close-panel-btn"
+                    type="button"
+                    aria-label="Close opportunities panel"
+                  >
+                    &times;
+                  </button>
+                </div>
               </div>
               <div id="loadingState" class="loading-state hidden">Loading opportunities...</div>
               <div id="errorState" class="error-state hidden">
@@ -142,6 +164,28 @@
                 <button id="upgradeBtn" class="primary" type="button">
                   Upgrade to Premium
                 </button>
+              </div>
+              <div class="setting-group">
+                <label class="setting-label">
+                  <span>Text Size</span>
+                  <span id="fontSizeValue" class="setting-value">Medium</span>
+                </label>
+                <input
+                  id="fontSizeSlider"
+                  type="range"
+                  min="12"
+                  max="20"
+                  value="14"
+                  step="2"
+                  aria-label="Adjust text size"
+                />
+                <div class="slider-labels">
+                  <span>Small</span>
+                  <span>Medium</span>
+                  <span>Large</span>
+                  <span>X-Large</span>
+                  <span>XX-Large</span>
+                </div>
               </div>
               <label class="checkbox toggle">
                 <input id="showPricesToggle" type="checkbox" checked />

@@ -167,6 +167,10 @@ const elements = {
   favoritesLocked: document.getElementById("favoritesLocked"),
   favoritesUpgradeBtn: document.getElementById("favoritesUpgradeBtn"),
   favoritesBadge: document.getElementById("favoritesBadge"),
+  closeResultsBtn: document.getElementById("closeResultsBtn"),
+  closeFiltersBtn: document.getElementById("closeFiltersBtn"),
+  fontSizeSlider: document.getElementById("fontSizeSlider"),
+  fontSizeValue: document.getElementById("fontSizeValue"),
   showPricesToggle: document.getElementById("showPricesToggle"),
   autoOpenResultsToggle: document.getElementById("autoOpenResultsToggle"),
   mapTab: document.querySelector('.tab-button[data-tab="map"]'),
@@ -289,21 +293,6 @@ function favoriteButtonHTML(isFavorite, label = "Add to favorites") {
         />
       </svg>
     </button>
-  `;
-}
-
-function favoriteIndicatorHTML(isFavorite) {
-  if (!isFavorite) {
-    return "";
-  }
-  return `
-    <span class="price-star" aria-label="Favorited" title="Favorited">
-      <svg class="star-icon filled" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path
-          d="M12 3.5l2.9 5.88 6.49.94-4.7 4.58 1.11 6.48L12 18.98l-5.8 3.4 1.11-6.48-4.7-4.58 6.49-.94L12 3.5z"
-        />
-      </svg>
-    </span>
   `;
 }
 
@@ -493,7 +482,7 @@ function renderFavorites() {
       <div class="card-details">
         <div><span>Agency:</span> ${contract.agency}</div>
         <div><span>Location:</span> ${contract.location}</div>
-        <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
+        <div><span>Value:</span> ${formatValue(contract.value)}</div>
       </div>
       <div class="card-actions">
         <div class="card-meta">${contract.category}</div>
@@ -533,9 +522,14 @@ function clearMarkers() {
 function createPriceIcon(value) {
   return L.divIcon({
     className: "price-pin",
-    html: `<span class="pin-label">${formatShortValue(value)}</span>`,
-    iconSize: [80, 36],
-    iconAnchor: [40, 36],
+    html: `
+      <div class="pin-label">
+        <span class="pin-star" aria-hidden="true">★</span>
+        <span class="pin-amount">${formatShortValue(value)}</span>
+      </div>
+    `,
+    iconSize: [90, 36],
+    iconAnchor: [45, 36],
     popupAnchor: [0, -30],
   });
 }
@@ -596,7 +590,7 @@ function renderList(results) {
         <div class="card-details">
           <div><span>Agency:</span> ${contract.agency}</div>
           <div><span>Location:</span> ${contract.location}</div>
-          <div><span>Value:</span> ${formatValue(contract.value)}${favoriteIndicatorHTML(isFavorite)}</div>
+          <div><span>Value:</span> ${formatValue(contract.value)}</div>
           <div><span>Due:</span> ${formatDate(contract.dueDate)}</div>
         </div>
       `;
@@ -675,6 +669,19 @@ function renderContracts() {
   render();
 }
 
+function applyFontSize(size) {
+  const labels = {
+    12: "Small",
+    14: "Medium",
+    16: "Large",
+    18: "X-Large",
+    20: "XX-Large",
+  };
+  elements.fontSizeValue.textContent = labels[size] || "Medium";
+  document.documentElement.style.setProperty("--base-font-size", `${size}px`);
+  document.body.style.fontSize = `${size}px`;
+}
+
 function render() {
   refreshFavoriteIds();
   const filters = getFilters();
@@ -744,6 +751,8 @@ elements.resetFilters.addEventListener("click", () => {
 
 elements.filtersToggle.addEventListener("click", () => togglePanel("filters"));
 elements.resultsToggle.addEventListener("click", () => togglePanel("results"));
+elements.closeResultsBtn.addEventListener("click", () => togglePanel("results"));
+elements.closeFiltersBtn.addEventListener("click", () => togglePanel("filters"));
 elements.mapTab.addEventListener("click", () => {
   activePanel = null;
   updatePanels();
@@ -758,6 +767,16 @@ elements.autoOpenResultsToggle.addEventListener("change", () => {
     activePanel = "results";
     updatePanels();
   }
+});
+
+const savedFontSize = localStorage.getItem("fontSizePreference") || "14";
+elements.fontSizeSlider.value = savedFontSize;
+applyFontSize(savedFontSize);
+
+elements.fontSizeSlider.addEventListener("input", (event) => {
+  const size = event.target.value;
+  applyFontSize(size);
+  localStorage.setItem("fontSizePreference", size);
 });
 
 elements.favoritesUpgradeBtn.addEventListener("click", () => Auth.openUpgradeModal());
