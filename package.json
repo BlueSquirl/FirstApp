@@ -1,0 +1,8 @@
+{
+  "name": "contractmap",
+  "version": "1.0.0",
+  "description": "Government contract opportunities map",
+  "dependencies": {
+    "firebase-admin": "^13.6.1"
+  }
+}
