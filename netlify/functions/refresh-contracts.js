@@ -19,34 +19,23 @@ const cityCache = require('../../city-coordinates-cache.json');
 // Geocoding helper
 async function geocodeLocation(city, state) {
   if (!city || !state) {
-    console.log(`No city/state provided, using state center for ${state}`);
     return getStateCenter(state || 'US');
   }
   
-  // Check cache first
-  const normalizedCity = String(city).trim();
+  // Normalize city name: trim, lowercase, remove extra spaces
+  const normalizedCity = city.trim().toLowerCase().replace(/\s+/g, ' ');
   const normalizedState = String(state).trim().toUpperCase();
-  console.log(`Looking for: ${normalizedCity}, ${normalizedState} in cache`);
   
-  if (cityCache[normalizedState] && cityCache[normalizedState][normalizedCity]) {
-    console.log(`✅ Cache HIT for ${normalizedCity}, ${normalizedState}`);
-    return cityCache[normalizedState][normalizedCity];
+  // Check cache with normalized names
+  if (cityCache[normalizedState]) {
+    for (const cachedCity in cityCache[normalizedState]) {
+      if (cachedCity.toLowerCase() === normalizedCity) {
+        return cityCache[normalizedState][cachedCity];
+      }
+    }
   }
   
-  const cacheEntries = cityCache[normalizedState] || {};
-  const lowerCity = normalizedCity.toLowerCase();
-  const matchKey = Object.keys(cacheEntries).find(
-    (name) => name.toLowerCase() === lowerCity
-  );
-  if (matchKey) {
-    console.log(`✅ Cache HIT (case-insensitive) for ${normalizedCity}, ${normalizedState}`);
-    return cacheEntries[matchKey];
-  }
-  
-  console.log(`❌ Cache MISS for ${normalizedCity}, ${normalizedState} - using state center`);
-  console.log(`Available cities in ${normalizedState}:`, Object.keys(cacheEntries));
-  
-  // Fallback to state center if not in cache
+  // Cache miss - use state center
   return getStateCenter(normalizedState);
 }
 
