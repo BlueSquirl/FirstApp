@@ -8,10 +8,8 @@ import {
 
 const { Auth, Favorites } = window;
 
-console.log("Firebase config:", {
-  projectId: db.app.options.projectId,
-  authDomain: db.app.options.authDomain,
-});
+console.log("Firebase projectId:", db.app.options.projectId);
+console.log("Firebase authDomain:", db.app.options.authDomain);
 
 const mockContractData = [
   {
