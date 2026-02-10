@@ -112,7 +112,11 @@ exports.handler = async (event, context) => {
     
     const data = await response.json();
     
-    console.log(`Received ${data.opportunitiesData?.length || 0} contracts`);
+    console.log(`Received ${data.opportunitiesData?.length || 0} opportunities from SAM.gov`);
+    
+    if (!data.opportunitiesData || data.opportunitiesData.length === 0) {
+      console.error('No opportunities data received from SAM.gov');
+    }
     
     // Transform contracts
     const transformedContracts = [];
@@ -139,6 +143,8 @@ exports.handler = async (event, context) => {
       });
     }
     
+    console.log(`Preparing to save ${transformedContracts.length} contracts to Firestore`);
+    console.log('Sample contract structure:', transformedContracts[0]);
     console.log('Storing contracts in Firestore...');
     
     // Store in Firestore using batch
@@ -151,12 +157,19 @@ exports.handler = async (event, context) => {
     });
     
     // Add new contracts
-    transformedContracts.forEach(contract => {
+    transformedContracts.forEach((contract, index) => {
+      console.log(`Adding contract ${index + 1}/${transformedContracts.length}: ${contract.id}`);
       const docRef = db.collection('contracts').doc(contract.id);
       batch.set(docRef, contract);
     });
     
-    await batch.commit();
+    try {
+      await batch.commit();
+      console.log('Batch commit successful');
+    } catch (error) {
+      console.error('Batch commit failed:', error);
+      throw error;
+    }
     
     // Update metadata
     await db.collection('metadata').doc('lastRefresh').set({
