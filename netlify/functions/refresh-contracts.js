@@ -149,6 +149,7 @@ exports.handler = async (event, context) => {
     
     // Store in Firestore using batch
     const batch = db.batch();
+    console.log('Batch created:', Boolean(batch));
     
     // Delete old contracts
     const oldContracts = await db.collection('contracts').get();
@@ -163,11 +164,17 @@ exports.handler = async (event, context) => {
       batch.set(docRef, contract);
     });
     
+    console.log('All contracts added to batch, committing now...');
+    
     try {
       await batch.commit();
-      console.log('Batch commit successful');
+      console.log('✅ Batch commit successful! Contracts saved to Firestore.');
     } catch (error) {
-      console.error('Batch commit failed:', error);
+      console.error('❌ Batch commit failed:', {
+        message: error.message,
+        code: error.code,
+        details: error
+      });
       throw error;
     }
     
