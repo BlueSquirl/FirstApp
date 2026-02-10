@@ -346,67 +346,34 @@ function hideErrorState() {
 
 async function loadContracts() {
   console.log("Loading contracts from Firestore...");
-  console.log("Firestore app:", db?.app?.name);
   showLoadingState();
   hideErrorState();
 
   try {
-    const contractsRef = collection(db, "contracts");
-    console.log("Attempting to fetch from collection: contracts");
-    let querySnapshot;
-    try {
-      const contractsQuery = query(contractsRef, orderBy("postedDate", "desc"));
-      querySnapshot = await getDocs(contractsQuery);
-    } catch (queryError) {
-      console.warn(
-        "Ordered Firestore query failed, retrying without orderBy:",
-        queryError
-      );
-      querySnapshot = await getDocs(contractsRef);
+    const snapshot = await getDocs(collection(db, "contracts"));
+
+    console.log("Raw snapshot:", snapshot);
+    console.log("Snapshot size:", snapshot.size);
+    console.log("Snapshot empty:", snapshot.empty);
+
+    if (snapshot.empty) {
+      console.log("Snapshot is empty, but should have data");
+      throw new Error("No contracts found");
     }
 
-    console.log("Firestore query snapshot size:", querySnapshot.size);
-    console.log("Firestore query empty?", querySnapshot.empty);
-    querySnapshot.forEach((doc) => {
-      console.log("Doc ID:", doc.id);
+    const contracts = [];
+    snapshot.forEach((doc) => {
+      console.log("Processing doc:", doc.id);
+      contracts.push(doc.data());
     });
-    contractData = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    console.log("Sample contract:", contractData[0]);
 
-    console.log(`Loaded ${contractData.length} contracts from Firestore cache`);
-
-    try {
-      const metadataSnapshot = await getDocs(collection(db, "metadata"));
-      metadataSnapshot.forEach((doc) => {
-        if (doc.id === "lastRefresh") {
-          const data = doc.data();
-          const lastUpdate = data.timestamp?.toDate();
-          console.log("Data last refreshed:", lastUpdate);
-        }
-      });
-    } catch (e) {
-      console.log("No metadata available yet");
-    }
-
-    if (contractData.length === 0) {
-      console.log("No contracts in Firestore, using mock data");
-      contractData = [...mockContractData];
-    }
+    contractData = contracts;
+    console.log(`Loaded ${contractData.length} contracts`);
 
     renderContracts();
   } catch (error) {
-    console.error("Failed to load contracts from Firestore:", error);
-    console.error("Firestore error details:", {
-      code: error.code,
-      message: error.message,
-      name: error.name,
-    });
-    console.log("Falling back to mock data");
+    console.error("Error:", error);
     contractData = [...mockContractData];
-    showErrorState("Unable to load live contracts. Showing sample data.");
     renderContracts();
   } finally {
     hideLoadingState();
