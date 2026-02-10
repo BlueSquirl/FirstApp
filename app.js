@@ -8,6 +8,11 @@ import {
 
 const { Auth, Favorites } = window;
 
+console.log("Firebase config:", {
+  projectId: db.app.options.projectId,
+  authDomain: db.app.options.authDomain,
+});
+
 const mockContractData = [
   {
     id: "c1",
@@ -349,6 +354,7 @@ async function loadContracts() {
 
   try {
     const contractsRef = collection(db, "contracts");
+    console.log("Attempting to fetch from collection: contracts");
     let querySnapshot;
     try {
       const contractsQuery = query(contractsRef, orderBy("postedDate", "desc"));
@@ -362,6 +368,10 @@ async function loadContracts() {
     }
 
     console.log("Firestore query snapshot size:", querySnapshot.size);
+    console.log("Firestore query empty?", querySnapshot.empty);
+    querySnapshot.forEach((doc) => {
+      console.log("Doc ID:", doc.id);
+    });
     contractData = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -391,6 +401,11 @@ async function loadContracts() {
     renderContracts();
   } catch (error) {
     console.error("Failed to load contracts from Firestore:", error);
+    console.error("Firestore error details:", {
+      code: error.code,
+      message: error.message,
+      name: error.name,
+    });
     console.log("Falling back to mock data");
     contractData = [...mockContractData];
     showErrorState("Unable to load live contracts. Showing sample data.");
