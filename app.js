@@ -343,15 +343,30 @@ function hideErrorState() {
 
 async function loadContracts() {
   console.log("Loading contracts from Firestore...");
+  console.log("Firestore app:", db?.app?.name);
   showLoadingState();
   hideErrorState();
 
   try {
     const contractsRef = collection(db, "contracts");
-    const contractsQuery = query(contractsRef, orderBy("postedDate", "desc"));
-    const querySnapshot = await getDocs(contractsQuery);
+    let querySnapshot;
+    try {
+      const contractsQuery = query(contractsRef, orderBy("postedDate", "desc"));
+      querySnapshot = await getDocs(contractsQuery);
+    } catch (queryError) {
+      console.warn(
+        "Ordered Firestore query failed, retrying without orderBy:",
+        queryError
+      );
+      querySnapshot = await getDocs(contractsRef);
+    }
 
-    contractData = querySnapshot.docs.map((doc) => doc.data());
+    console.log("Firestore query snapshot size:", querySnapshot.size);
+    contractData = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    console.log("Sample contract:", contractData[0]);
 
     console.log(`Loaded ${contractData.length} contracts from Firestore cache`);
 
@@ -805,4 +820,5 @@ Favorites.onChange(() => {
 document.body.classList.toggle("hide-pin-labels", !elements.showPricesToggle.checked);
 Auth.initAuth();
 updatePanels();
+console.log("Invoking loadContracts on page load");
 loadContracts();
