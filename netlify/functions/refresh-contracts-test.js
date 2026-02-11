@@ -1,17 +1,17 @@
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
+// Firebase Admin is intentionally disabled for local testing.
+// Commented out to allow running without FIREBASE_PRIVATE_KEY.
+// if (!admin.apps.length) {
+//   admin.initializeApp({
+//     credential: admin.credential.cert({
+//       projectId: process.env.FIREBASE_PROJECT_ID,
+//       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+//       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+//     })
+//   });
+// }
+// const db = admin.firestore();
 
 // Import city cache
 const cityCache = require('../../city-coordinates-cache.json');
@@ -244,49 +244,10 @@ exports.handler = async (event, context) => {
       });
     }
     
-    console.log(`Preparing to save ${transformedContracts.length} contracts to Firestore`);
+    console.log(`Prepared ${transformedContracts.length} contracts (local test mode)`);
     console.log('Sample contract structure:', transformedContracts[0]);
-    console.log('Storing contracts in Firestore...');
-    
-    // Store in Firestore using batch
-    const batch = db.batch();
-    console.log('Batch created:', Boolean(batch));
-    
-    // Delete old contracts
-    const oldContracts = await db.collection('contracts').get();
-    oldContracts.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    
-    // Add new contracts
-    transformedContracts.forEach((contract, index) => {
-      console.log(`Adding contract ${index + 1}/${transformedContracts.length}: ${contract.id}`);
-      const docRef = db.collection('contracts').doc(contract.id);
-      batch.set(docRef, contract);
-    });
-    
-    console.log('All contracts added to batch, committing now...');
-    
-    try {
-      await batch.commit();
-      console.log('✅ Batch commit successful! Contracts saved to Firestore.');
-    } catch (error) {
-      console.error('❌ Batch commit failed:', {
-        message: error.message,
-        code: error.code,
-        details: error
-      });
-      throw error;
-    }
-    
-    // Update metadata
-    await db.collection('metadata').doc('lastRefresh').set({
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      contractCount: transformedContracts.length,
-      processingTime: Date.now() - startTime
-    });
-    
-    console.log(`Successfully refreshed ${transformedContracts.length} contracts in ${Date.now() - startTime}ms`);
+    console.log('Transformed contracts:', transformedContracts);
+    console.log(`Completed test refresh in ${Date.now() - startTime}ms`);
     
     return {
       statusCode: 200,
@@ -294,7 +255,8 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: true,
         contractsUpdated: transformedContracts.length,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
+        contracts: transformedContracts
       })
     };
     
