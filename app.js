@@ -187,6 +187,9 @@ const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
+map.on("moveend zoomend", () => {
+  render();
+});
 const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
 let activePanel = null;
@@ -696,6 +699,21 @@ function applyAutoOpenResults() {
   }
 }
 
+function filterByMapBounds(contracts) {
+  if (!map || typeof map.getBounds !== "function") {
+    return contracts;
+  }
+  const bounds = map.getBounds();
+  return contracts.filter((contract) => {
+    const lat = Number(contract.lat);
+    const lng = Number(contract.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return false;
+    }
+    return bounds.contains([lat, lng]);
+  });
+}
+
 function updateCounts(count) {
   elements.resultsCount.textContent = `${count} open`;
   elements.emptyState.classList.toggle("hidden", count > 0);
@@ -723,12 +741,15 @@ function render() {
   const filters = getFilters();
   const filtered = contractData.filter((contract) => matchesFilters(contract, filters));
   const results = sortResults(filtered, filters.sortBy);
+  const visibleResults = filterByMapBounds(results);
   const isPremium = Auth.isUserSubscribed();
-  lockedJobIds = isPremium ? new Set() : new Set(results.slice(3).map((item) => item.id));
+  lockedJobIds = isPremium
+    ? new Set()
+    : new Set(visibleResults.slice(3).map((item) => item.id));
 
-  renderList(results);
-  renderMarkers(results);
-  updateCounts(results.length);
+  renderList(visibleResults);
+  renderMarkers(visibleResults);
+  updateCounts(visibleResults.length);
   renderFavorites();
   updateFavoritesBadge();
   applyAutoOpenResults();
