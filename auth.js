@@ -24,6 +24,7 @@
     loginError: document.getElementById("loginError"),
     signupError: document.getElementById("signupError"),
     upgradeModal: document.getElementById("upgradeModal"),
+    onboardingModal: document.getElementById("onboardingModal"),
     upgradeNowBtn: document.getElementById("upgradeNowBtn"),
     upgradeLoginBtn: document.getElementById("upgradeLoginBtn"),
     upgradeCloseBtn: document.getElementById("upgradeCloseBtn"),
@@ -42,6 +43,7 @@
   };
 
   function notifyAuthChange() {
+    loadPreferencesIntoForm();
     authListeners.forEach((listener) => listener(currentUser));
     window.dispatchEvent(
       new CustomEvent("auth:change", { detail: { user: currentUser } })
@@ -249,6 +251,182 @@
     return { ok: true };
   }
 
+  let currentOnboardingStep = 1;
+  const onboardingData = {
+    states: [],
+    industries: [],
+    minValue: 0,
+    maxValue: 999999999,
+  };
+
+  function showOnboardingModal() {
+    const modal = elements.onboardingModal || document.getElementById("onboardingModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    currentOnboardingStep = 1;
+    updateOnboardingStep();
+  }
+
+  function closeOnboardingModal() {
+    const modal = elements.onboardingModal || document.getElementById("onboardingModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  function updateOnboardingStep() {
+    const steps = document.querySelectorAll(".onboarding-step");
+    const dots = document.querySelectorAll(".progress-dot");
+    const backBtn = document.getElementById("onboardingBack");
+    const nextBtn = document.getElementById("onboardingNext");
+    const finishBtn = document.getElementById("onboardingFinish");
+
+    steps.forEach((step, index) => {
+      step.classList.toggle("hidden", index + 1 !== currentOnboardingStep);
+    });
+
+    dots.forEach((dot, index) => {
+      dot.classList.toggle("active", index + 1 === currentOnboardingStep);
+    });
+
+    if (backBtn) backBtn.classList.toggle("hidden", currentOnboardingStep === 1);
+    if (nextBtn) nextBtn.classList.toggle("hidden", currentOnboardingStep === 3);
+    if (finishBtn) finishBtn.classList.toggle("hidden", currentOnboardingStep !== 3);
+  }
+
+  function validateOnboardingStep(step) {
+    if (step === 1) {
+      const selectedStates = document.querySelectorAll('input[name="state"]:checked');
+      if (selectedStates.length === 0 || selectedStates.length > 2) {
+        const el = document.getElementById("stateError");
+        if (el) el.classList.remove("hidden");
+        return false;
+      }
+      const stateError = document.getElementById("stateError");
+      if (stateError) stateError.classList.add("hidden");
+      onboardingData.states = Array.from(selectedStates).map((cb) => cb.value);
+    }
+
+    if (step === 2) {
+      const selectedIndustries = document.querySelectorAll('input[name="industry"]:checked');
+      if (selectedIndustries.length === 0) {
+        const el = document.getElementById("industryError");
+        if (el) el.classList.remove("hidden");
+        return false;
+      }
+      const industryError = document.getElementById("industryError");
+      if (industryError) industryError.classList.add("hidden");
+      onboardingData.industries = Array.from(selectedIndustries).map((cb) => cb.value);
+    }
+
+    if (step === 3) {
+      const minEl = document.getElementById("minContractValue");
+      const maxEl = document.getElementById("maxContractValue");
+      onboardingData.minValue = minEl ? parseInt(minEl.value, 10) : 0;
+      onboardingData.maxValue = maxEl ? parseInt(maxEl.value, 10) : 999999999;
+    }
+
+    return true;
+  }
+
+  function saveUserPreferences(userId, preferences) {
+    const users = loadUsers();
+    const updatedUsers = users.map((user) => {
+      if (user.userId === userId) {
+        return {
+          ...user,
+          preferences: { ...preferences },
+          onboardingComplete: true,
+        };
+      }
+      return user;
+    });
+    saveUsers(updatedUsers);
+
+    if (currentUser && currentUser.userId === userId) {
+      currentUser = {
+        ...currentUser,
+        preferences: { ...preferences },
+        onboardingComplete: true,
+      };
+    }
+  }
+
+  function loadPreferencesIntoForm() {
+    const state1 = document.getElementById("settingsState1");
+    const state2 = document.getElementById("settingsState2");
+    const minVal = document.getElementById("settingsMinValue");
+    const maxVal = document.getElementById("settingsMaxValue");
+    const industryInputs = document.querySelectorAll('input[name="settingsIndustry"]');
+    if (!state1 || !state2) return;
+
+    const prefs = currentUser?.preferences;
+    if (prefs) {
+      const states = prefs.states || [];
+      state1.value = states[0] || "";
+      state2.value = states[1] || "";
+      if (minVal) minVal.value = String(prefs.minValue ?? 0);
+      if (maxVal) maxVal.value = String(prefs.maxValue ?? 999999999);
+      industryInputs.forEach((input) => {
+        input.checked = (prefs.industries || []).includes(input.value);
+      });
+    } else {
+      state1.value = "";
+      state2.value = "";
+      if (minVal) minVal.value = "0";
+      if (maxVal) maxVal.value = "999999999";
+      industryInputs.forEach((input) => { input.checked = false; });
+    }
+  }
+
+  function savePreferencesFromSettings() {
+    const state1 = document.getElementById("settingsState1");
+    const state2 = document.getElementById("settingsState2");
+    const minVal = document.getElementById("settingsMinValue");
+    const maxVal = document.getElementById("settingsMaxValue");
+    const industryInputs = document.querySelectorAll('input[name="settingsIndustry"]:checked');
+    const errEl = document.getElementById("settingsPreferencesError");
+    const successEl = document.getElementById("settingsPreferencesSuccess");
+
+    if (!currentUser) {
+      if (errEl) { errEl.textContent = "Please log in to save preferences."; errEl.classList.remove("hidden"); }
+      if (successEl) successEl.classList.add("hidden");
+      return;
+    }
+
+    const s1 = state1?.value?.trim() || "";
+    const s2 = state2?.value?.trim() || "";
+    const states = [s1, s2].filter(Boolean);
+    if (s2 && s1 === s2) states.pop();
+    const industries = Array.from(industryInputs).map((input) => input.value);
+
+    if (states.length === 0) {
+      if (errEl) { errEl.textContent = "Please select at least one state."; errEl.classList.remove("hidden"); }
+      if (successEl) successEl.classList.add("hidden");
+      return;
+    }
+    if (industries.length === 0) {
+      if (errEl) { errEl.textContent = "Please select at least one industry."; errEl.classList.remove("hidden"); }
+      if (successEl) successEl.classList.add("hidden");
+      return;
+    }
+
+    const preferences = {
+      states,
+      industries,
+      minValue: minVal ? parseInt(minVal.value, 10) : 0,
+      maxValue: maxVal ? parseInt(maxVal.value, 10) : 999999999,
+    };
+    saveUserPreferences(currentUser.userId, preferences);
+    if (errEl) { errEl.textContent = ""; errEl.classList.add("hidden"); }
+    if (successEl) {
+      successEl.classList.remove("hidden");
+      setTimeout(() => successEl.classList.add("hidden"), 3000);
+    }
+    window.dispatchEvent(new CustomEvent("preferences:updated", { detail: preferences }));
+  }
+
   function initAuth() {
     const users = loadUsers();
     const currentId = localStorage.getItem(CURRENT_USER_KEY);
@@ -309,7 +487,40 @@
       }
       setFormError(elements.signupError, "");
       closeAuthModal();
+      if (currentUser && !currentUser.onboardingComplete) {
+        setTimeout(() => showOnboardingModal(), 500);
+      }
     });
+
+    document.getElementById("onboardingBack")?.addEventListener("click", () => {
+      if (currentOnboardingStep > 1) {
+        currentOnboardingStep--;
+        updateOnboardingStep();
+      }
+    });
+
+    document.getElementById("onboardingNext")?.addEventListener("click", () => {
+      if (validateOnboardingStep(currentOnboardingStep)) {
+        currentOnboardingStep++;
+        updateOnboardingStep();
+      }
+    });
+
+    document.getElementById("onboardingForm")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (validateOnboardingStep(3)) {
+        saveUserPreferences(currentUser.userId, onboardingData);
+        closeOnboardingModal();
+        window.dispatchEvent(
+          new CustomEvent("preferences:updated", { detail: onboardingData })
+        );
+      }
+    });
+
+    const onboardingBackdrop = elements.onboardingModal?.querySelector(".auth-backdrop");
+    onboardingBackdrop?.addEventListener("click", closeOnboardingModal);
+
+    document.getElementById("savePreferencesBtn")?.addEventListener("click", savePreferencesFromSettings);
 
     document.addEventListener("keydown", (event) => {
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "d") {
@@ -363,5 +574,8 @@
     onAuthChange: (listener) => authListeners.add(listener),
     updateSubscriptionTier,
     loadUsers,
+    showOnboardingModal,
+    getUserPreferences: () => (currentUser?.preferences ? { ...currentUser.preferences } : null),
+    loadPreferencesIntoForm,
   };
 })();

@@ -3,3 +3,7 @@
 
 [build.environment]
   SECRETS_SCAN_OMIT_PATHS = "firebase-config.js"
+
+# Refresh contracts: business hours (7 AM–5 PM CST = 13–23 UTC) every hour; off hours at 1, 5, 9 UTC every 4 hours
+[functions."refresh-contracts"]
+  schedule = "0 1,5,9,13-23 * * *"

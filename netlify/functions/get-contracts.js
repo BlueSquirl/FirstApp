@@ -28,24 +28,83 @@ function formatCurrency(amount) {
   return `$${Math.round(amount).toLocaleString("en-US")}`;
 }
 
+// Comprehensive NAICS code to category mapping
+const NAICS_CATEGORIES = {
+  "23": "Construction",
+  "236": "Construction",
+  "237": "Construction",
+  "2371": "Infrastructure",
+  "23711": "Water & Utilities",
+  "23712": "Energy",
+  "2373": "Transportation",
+  "238": "Construction",
+  "221": "Energy & Utilities",
+  "2211": "Energy",
+  "2213": "Water & Utilities",
+  "48": "Transportation & Logistics",
+  "49": "Transportation & Logistics",
+  "486": "Energy",
+  "562": "Environmental Services",
+  "531": "Real Estate",
+  "5311": "Real Estate",
+  "5312": "Real Estate",
+  "5313": "Real Estate",
+  "621": "Healthcare",
+  "6211": "Healthcare",
+  "6212": "Healthcare",
+  "6213": "Healthcare",
+  "6214": "Healthcare",
+  "6215": "Healthcare",
+  "6216": "Healthcare",
+  "6219": "Healthcare",
+  "622": "Healthcare",
+  "623": "Healthcare",
+  "5112": "IT & Software",
+  "518": "IT & Software",
+  "5182": "IT & Software",
+  "5415": "IT & Software",
+  "54151": "IT & Software",
+  "541511": "IT & Software",
+  "541512": "IT & Software",
+  "541513": "IT & Software",
+  "541519": "IT & Software",
+  "541": "Professional Services",
+  "5411": "Legal Services",
+  "5412": "Accounting Services",
+  "5413": "Architecture & Engineering",
+  "5414": "Design Services",
+  "5416": "Management Consulting",
+  "5417": "Scientific R&D",
+  "5418": "Marketing & Advertising",
+  "5419": "Other Professional Services",
+  "42": "Wholesale Trade",
+  "423": "Merchant Wholesalers - Durable Goods",
+  "424": "Merchant Wholesalers - Nondurable Goods",
+  "425": "Wholesale Electronic Markets",
+  "31": "Manufacturing",
+  "32": "Manufacturing",
+  "33": "Manufacturing",
+  "611": "Education & Training",
+  "52": "Finance & Insurance",
+  "522": "Finance",
+  "524": "Insurance",
+  "722": "Food Services",
+  "561": "Administrative Services",
+  "5614": "Business Support Services",
+  "5615": "Travel Arrangement",
+  "5616": "Security Services",
+  "5617": "Facility Support Services",
+  "928": "Defense & National Security",
+  "92811": "Defense",
+  "92": "Government Services",
+};
+
 function categorizeContract(naicsCode) {
-  if (!naicsCode) {
-    return "Federal";
-  }
-
-  const code = String(naicsCode);
-
-  if (code.startsWith("23") || code.startsWith("48") || code.startsWith("49")) {
-    return "Transportation";
-  }
-  if (code.startsWith("221") || code.startsWith("562")) {
-    return "Water";
-  }
-  if (code.startsWith("236") || code.startsWith("237")) {
-    return "Municipal";
-  }
-  if (code.startsWith("221") || code.startsWith("486")) {
-    return "Energy";
+  if (!naicsCode) return "Federal";
+  const code = String(naicsCode).trim();
+  for (let len = code.length; len >= 1; len--) {
+    const prefix = code.slice(0, len);
+    if (NAICS_CATEGORIES[prefix]) return NAICS_CATEGORIES[prefix];
   }
   return "Federal";
 }
@@ -138,11 +197,9 @@ async function geocodeLocation(city, state) {
   }
 
   if (cityCache[state] && cityCache[state][city]) {
-    console.log(`Cache hit: ${city}, ${state}`);
     return cityCache[state][city];
   }
 
-  console.log(`Cache miss: ${city}, ${state} - geocoding...`);
   try {
     const query = encodeURIComponent(`${city}, ${state}, USA`);
     const response = await fetch(
@@ -156,12 +213,10 @@ async function geocodeLocation(city, state) {
 
     const data = await response.json();
     if (data && data.length > 0) {
-      const coords = {
+      return {
         lat: parseFloat(data[0].lat),
         lng: parseFloat(data[0].lon),
       };
-      console.log(`Geocoded: ${city}, ${state} -> ${coords.lat}, ${coords.lng}`);
-      return coords;
     }
     return getStateCenter(state);
   } catch (error) {
@@ -191,7 +246,6 @@ exports.handler = async (event) => {
     const postedTo = new Date();
     const postedFrom = new Date();
     postedFrom.setDate(postedTo.getDate() - 90);
-    console.log("Date range:", formatDate(postedFrom), "to", formatDate(postedTo));
 
     const apiParams = new URLSearchParams({
       api_key: apiKey,
@@ -232,9 +286,6 @@ exports.handler = async (event) => {
       const cacheHit = city && stateCode && cityCache[stateCode]?.[city];
       if (!cacheHit && city && stateCode) {
         geocodingCallsMade += 1;
-        if (geocodingCallsMade % 10 === 0) {
-          console.log(`Geocoded ${geocodingCallsMade} cities so far...`);
-        }
         await delay(1100);
       }
 
@@ -262,10 +313,6 @@ exports.handler = async (event) => {
       });
     }
 
-    console.log(
-      `Total contracts: ${transformedContracts.length}, API calls made: ${geocodingCallsMade}`
-    );
-
     return {
       statusCode: 200,
       headers: {
@@ -275,6 +322,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ opportunities: transformedContracts }),
     };
   } catch (error) {
+    console.error("get-contracts error:", error);
     return {
       statusCode: 500,
       headers: {

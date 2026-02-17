@@ -187,6 +187,9 @@ const map = L.map("map", { scrollWheelZoom: true }).setView([39.5, -98.35], 4);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
+map.on("moveend zoomend", () => {
+  render();
+});
 const markersLayer = L.layerGroup().addTo(map);
 const markersById = new Map();
 let activePanel = null;
@@ -363,12 +366,28 @@ async function loadContracts() {
 
     const contracts = [];
     snapshot.forEach((doc) => {
-      console.log("Processing doc:", doc.id);
       contracts.push(doc.data());
     });
 
     contractData = contracts;
-    console.log(`Loaded ${contractData.length} contracts`);
+
+    const userPreferences = window.Auth?.getUserPreferences?.() ?? null;
+    if (userPreferences) {
+      contractData = contractData.filter((contract) => {
+        const contractState = contract.location?.split(", ")[1];
+        if (userPreferences.states?.length && !userPreferences.states.includes(contractState)) {
+          return false;
+        }
+        if (userPreferences.industries?.length && !userPreferences.industries.includes(contract.category)) {
+          return false;
+        }
+        const value = parseInt(String(contract.value || "").replace(/[^0-9]/g, ""), 10) || 0;
+        if (value < (userPreferences.minValue ?? 0) || value > (userPreferences.maxValue ?? 999999999)) {
+          return false;
+        }
+        return true;
+      });
+    }
 
     renderContracts();
   } catch (error) {
@@ -514,16 +533,19 @@ function clearMarkers() {
   markersById.clear();
 }
 
-function createPriceIcon(value, isFavorite) {
+function createPriceIcon(value, isFavorite, count = 1) {
   const starMarkup = isFavorite
     ? '<span class="pin-star" aria-hidden="true">★</span>'
     : "";
+  const countMarkup =
+    count > 1 ? `<span class="pin-count" aria-hidden="true">${count}</span>` : "";
   return L.divIcon({
     className: "price-pin",
     html: `
       <div class="pin-label">
         ${starMarkup}
         <span class="pin-amount">${formatShortValue(value)}</span>
+        ${countMarkup}
       </div>
     `,
     iconSize: [90, 36],
@@ -624,19 +646,53 @@ function renderList(results) {
   });
 }
 
+function createGroupedPopupContent(contracts) {
+  const location = contracts[0]?.location || "Unknown";
+  const items = contracts
+    .map((contract) => `<li>${contract.title}</li>`)
+    .join("");
+  return `
+    <div class="popup">
+      <strong>${contracts.length} opportunities</strong><br />
+      ${location}<br />
+      <ul class="popup-list">${items}</ul>
+    </div>
+  `;
+}
+
 function renderMarkers(results) {
   clearMarkers();
+  const grouped = new Map();
+
   results.forEach((contract) => {
     if (!Number.isFinite(contract.lat) || !Number.isFinite(contract.lng)) {
       return;
     }
-    const isFavorite = favoriteIds.has(contract.id);
-    const marker = L.marker([contract.lat, contract.lng], {
-      icon: createPriceIcon(contract.value, isFavorite),
+    const latKey = contract.lat.toFixed(5);
+    const lngKey = contract.lng.toFixed(5);
+    const key = `${latKey}|${lngKey}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key).push(contract);
+  });
+
+  grouped.forEach((contracts) => {
+    const primary = contracts[0];
+    const count = contracts.length;
+    const hasFavorite = contracts.some((contract) => favoriteIds.has(contract.id));
+    const marker = L.marker([primary.lat, primary.lng], {
+      icon: createPriceIcon(primary.value, hasFavorite, count),
     }).addTo(markersLayer);
-    marker.bindPopup(createPopupContent(contract, lockedJobIds.has(contract.id)));
-    marker.on("click", () => highlightCard(contract.id));
-    markersById.set(contract.id, marker);
+    const popupContent =
+      count > 1
+        ? createGroupedPopupContent(contracts)
+        : createPopupContent(primary, lockedJobIds.has(primary.id));
+    marker.bindPopup(popupContent);
+    marker.on("click", () => highlightCard(primary.id));
+    contracts.forEach((contract) => {
+      markersById.set(contract.id, marker);
+    });
   });
 }
 
@@ -657,6 +713,21 @@ function applyAutoOpenResults() {
     activePanel = "results";
     updatePanels();
   }
+}
+
+function filterByMapBounds(contracts) {
+  if (!map || typeof map.getBounds !== "function") {
+    return contracts;
+  }
+  const bounds = map.getBounds();
+  return contracts.filter((contract) => {
+    const lat = Number(contract.lat);
+    const lng = Number(contract.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return false;
+    }
+    return bounds.contains([lat, lng]);
+  });
 }
 
 function updateCounts(count) {
@@ -686,12 +757,15 @@ function render() {
   const filters = getFilters();
   const filtered = contractData.filter((contract) => matchesFilters(contract, filters));
   const results = sortResults(filtered, filters.sortBy);
+  const visibleResults = filterByMapBounds(results);
   const isPremium = Auth.isUserSubscribed();
-  lockedJobIds = isPremium ? new Set() : new Set(results.slice(3).map((item) => item.id));
+  lockedJobIds = isPremium
+    ? new Set()
+    : new Set(visibleResults.slice(3).map((item) => item.id));
 
-  renderList(results);
-  renderMarkers(results);
-  updateCounts(results.length);
+  renderList(visibleResults);
+  renderMarkers(visibleResults);
+  updateCounts(visibleResults.length);
   renderFavorites();
   updateFavoritesBadge();
   applyAutoOpenResults();
@@ -785,6 +859,9 @@ Auth.onAuthChange(() => {
 });
 Favorites.onChange(() => {
   render();
+});
+window.addEventListener("preferences:updated", () => {
+  loadContracts();
 });
 
 [

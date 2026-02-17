@@ -19,34 +19,23 @@ const cityCache = require('../../city-coordinates-cache.json');
 // Geocoding helper
 async function geocodeLocation(city, state) {
   if (!city || !state) {
-    console.log(`No city/state provided, using state center for ${state}`);
     return getStateCenter(state || 'US');
   }
   
-  // Check cache first
-  const normalizedCity = String(city).trim();
+  // Normalize city name: trim, lowercase, remove extra spaces
+  const normalizedCity = city.trim().toLowerCase().replace(/\s+/g, ' ');
   const normalizedState = String(state).trim().toUpperCase();
-  console.log(`Looking for: ${normalizedCity}, ${normalizedState} in cache`);
   
-  if (cityCache[normalizedState] && cityCache[normalizedState][normalizedCity]) {
-    console.log(`✅ Cache HIT for ${normalizedCity}, ${normalizedState}`);
-    return cityCache[normalizedState][normalizedCity];
+  // Check cache with normalized names
+  if (cityCache[normalizedState]) {
+    for (const cachedCity in cityCache[normalizedState]) {
+      if (cachedCity.toLowerCase() === normalizedCity) {
+        return cityCache[normalizedState][cachedCity];
+      }
+    }
   }
   
-  const cacheEntries = cityCache[normalizedState] || {};
-  const lowerCity = normalizedCity.toLowerCase();
-  const matchKey = Object.keys(cacheEntries).find(
-    (name) => name.toLowerCase() === lowerCity
-  );
-  if (matchKey) {
-    console.log(`✅ Cache HIT (case-insensitive) for ${normalizedCity}, ${normalizedState}`);
-    return cacheEntries[matchKey];
-  }
-  
-  console.log(`❌ Cache MISS for ${normalizedCity}, ${normalizedState} - using state center`);
-  console.log(`Available cities in ${normalizedState}:`, Object.keys(cacheEntries));
-  
-  // Fallback to state center if not in cache
+  // Cache miss - use state center
   return getStateCenter(normalizedState);
 }
 
@@ -69,37 +58,106 @@ function getStateCenter(stateCode) {
   return stateCenters[stateCode] || stateCenters['US'];
 }
 
-// Categorize contracts
+// Comprehensive NAICS code to category mapping
+const NAICS_CATEGORIES = {
+  '23': 'Construction',
+  '236': 'Construction',
+  '237': 'Construction',
+  '2371': 'Infrastructure',
+  '23711': 'Water & Utilities',
+  '23712': 'Energy',
+  '2373': 'Transportation',
+  '238': 'Construction',
+  '221': 'Energy & Utilities',
+  '2211': 'Energy',
+  '2213': 'Water & Utilities',
+  '48': 'Transportation & Logistics',
+  '49': 'Transportation & Logistics',
+  '486': 'Energy',
+  '562': 'Environmental Services',
+  '531': 'Real Estate',
+  '5311': 'Real Estate',
+  '5312': 'Real Estate',
+  '5313': 'Real Estate',
+  '621': 'Healthcare',
+  '6211': 'Healthcare',
+  '6212': 'Healthcare',
+  '6213': 'Healthcare',
+  '6214': 'Healthcare',
+  '6215': 'Healthcare',
+  '6216': 'Healthcare',
+  '6219': 'Healthcare',
+  '622': 'Healthcare',
+  '623': 'Healthcare',
+  '5112': 'IT & Software',
+  '518': 'IT & Software',
+  '5182': 'IT & Software',
+  '5415': 'IT & Software',
+  '54151': 'IT & Software',
+  '541511': 'IT & Software',
+  '541512': 'IT & Software',
+  '541513': 'IT & Software',
+  '541519': 'IT & Software',
+  '541': 'Professional Services',
+  '5411': 'Legal Services',
+  '5412': 'Accounting Services',
+  '5413': 'Architecture & Engineering',
+  '5414': 'Design Services',
+  '5416': 'Management Consulting',
+  '5417': 'Scientific R&D',
+  '5418': 'Marketing & Advertising',
+  '5419': 'Other Professional Services',
+  '42': 'Wholesale Trade',
+  '423': 'Merchant Wholesalers - Durable Goods',
+  '424': 'Merchant Wholesalers - Nondurable Goods',
+  '425': 'Wholesale Electronic Markets',
+  '31': 'Manufacturing',
+  '32': 'Manufacturing',
+  '33': 'Manufacturing',
+  '611': 'Education & Training',
+  '52': 'Finance & Insurance',
+  '522': 'Finance',
+  '524': 'Insurance',
+  '722': 'Food Services',
+  '561': 'Administrative Services',
+  '5614': 'Business Support Services',
+  '5615': 'Travel Arrangement',
+  '5616': 'Security Services',
+  '5617': 'Facility Support Services',
+  '928': 'Defense & National Security',
+  '92811': 'Defense',
+  '92': 'Government Services'
+};
+
 function categorizeContract(naicsCode) {
   if (!naicsCode) return 'Federal';
-  
-  const code = String(naicsCode);
-  
-  if (code.startsWith('23') || code.startsWith('48') || code.startsWith('49')) {
-    return 'Transportation';
+  const code = String(naicsCode).trim();
+  for (let len = code.length; len >= 1; len--) {
+    const prefix = code.slice(0, len);
+    if (NAICS_CATEGORIES[prefix]) return NAICS_CATEGORIES[prefix];
   }
-  
-  if (code.startsWith('221') || code.startsWith('562')) {
-    return 'Water';
-  }
-  
-  if (code.startsWith('236') || code.startsWith('237')) {
-    return 'Municipal';
-  }
-  
-  if (code.startsWith('221') || code.startsWith('486')) {
-    return 'Energy';
-  }
-  
   return 'Federal';
 }
 
+// 7 AM–5 PM CST = 13:00–23:59 UTC (CST is UTC-6)
+function isBusinessHoursUTC() {
+  const hour = new Date().getUTCHours();
+  return hour >= 13 && hour <= 23;
+}
+
 exports.handler = async (event, context) => {
-  console.log('Starting contract refresh at:', new Date().toISOString());
-  
+  const businessHours = isBusinessHoursUTC();
+  const limit = businessHours ? 100 : 50;
+  console.log(businessHours ? 'Starting refresh (business hours mode, limit=100)' : 'Starting refresh (off hours mode, limit=50)');
+
   const apiKey = process.env.SAM_API_KEY;
+  if (!apiKey) {
+    console.error('SAM_API_KEY is not set');
+    return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'SAM_API_KEY is not set' }) };
+  }
+
   const startTime = Date.now();
-  
+
   try {
     // Build date range
     const today = new Date();
@@ -115,32 +173,52 @@ exports.handler = async (event, context) => {
     
     const postedFrom = formatDate(ninetyDaysAgo);
     const postedTo = formatDate(today);
-    
-    console.log('Fetching contracts from SAM.gov...');
-    
-    const url = `https://api.sam.gov/opportunities/v2/search?api_key=${apiKey}&limit=50&postedFrom=${postedFrom}&postedTo=${postedTo}&ptype=o,k&active=true`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
+
+    let allOpportunities = [];
+    const usersSnapshot = await db.collection('users').get();
+    const allPreferences = [];
+    usersSnapshot.forEach(doc => {
+      const userData = doc.data();
+      if (userData.preferences && (userData.preferences.states?.length || userData.preferences.industries?.length)) {
+        allPreferences.push(userData.preferences);
+      }
     });
-    
-    if (!response.ok) {
-      throw new Error(`SAM.gov API error: ${response.status}`);
+    const uniqueStates = [...new Set(allPreferences.flatMap(p => p.states || []))].filter(Boolean);
+
+    if (uniqueStates.length > 0) {
+      console.log(`Fetching contracts for ${uniqueStates.length} states across ${allPreferences.length} users`);
+      const seenIds = new Set();
+      for (const state of uniqueStates) {
+        const url = `https://api.sam.gov/opportunities/v2/search?api_key=${apiKey}&limit=${limit}&postedFrom=${postedFrom}&postedTo=${postedTo}&state=${state}&ptype=o,k&active=true`;
+        const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (response.ok) {
+          const data = await response.json();
+          (data.opportunitiesData || []).forEach(opp => {
+            if (opp.noticeId && !seenIds.has(opp.noticeId)) {
+              seenIds.add(opp.noticeId);
+              allOpportunities.push(opp);
+            }
+          });
+        }
+      }
     }
-    
-    const data = await response.json();
-    
-    console.log(`Received ${data.opportunitiesData?.length || 0} opportunities from SAM.gov`);
-    
-    if (!data.opportunitiesData || data.opportunitiesData.length === 0) {
+
+    if (allOpportunities.length === 0) {
+      const url = `https://api.sam.gov/opportunities/v2/search?api_key=${apiKey}&limit=${limit}&postedFrom=${postedFrom}&postedTo=${postedTo}&ptype=o,k&active=true`;
+      const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (!response.ok) throw new Error(`SAM.gov API error: ${response.status}`);
+      const data = await response.json();
+      allOpportunities = data.opportunitiesData || [];
+    }
+
+    console.log(`Received ${allOpportunities.length} contracts`);
+
+    if (allOpportunities.length === 0) {
       console.error('No opportunities data received from SAM.gov');
     }
-    
-    // Transform contracts
+
     const transformedContracts = [];
-    
-    for (const opportunity of data.opportunitiesData || []) {
+    for (const opportunity of allOpportunities) {
       const city = opportunity.placeOfPerformance?.city?.name || null;
       const state = opportunity.placeOfPerformance?.state?.code || null;
       
@@ -157,19 +235,17 @@ exports.handler = async (event, context) => {
         agency: [opportunity.department, opportunity.subtier, opportunity.office].filter(Boolean).join(' - '),
         category: categorizeContract(opportunity.naicsCode || opportunity.classificationCode),
         contactEmail: opportunity.pointOfContact?.[0]?.email || 'N/A',
-        description: opportunity.title,
+        description: opportunity.description || opportunity.title || 'No description available',
+        solicitationNumber: opportunity.solicitationNumber || 'N/A',
+        url: opportunity.uiLink || opportunity.additionalInfoLink || 'https://sam.gov',
+        postedDate: opportunity.postedDate || null,
         source: 'SAM.gov'
       });
     }
     
-    console.log(`Preparing to save ${transformedContracts.length} contracts to Firestore`);
-    console.log('Sample contract structure:', transformedContracts[0]);
-    console.log('Storing contracts in Firestore...');
-    
     // Store in Firestore using batch
     const batch = db.batch();
-    console.log('Batch created:', Boolean(batch));
-    
+
     // Delete old contracts
     const oldContracts = await db.collection('contracts').get();
     oldContracts.docs.forEach(doc => {
@@ -177,23 +253,16 @@ exports.handler = async (event, context) => {
     });
     
     // Add new contracts
-    transformedContracts.forEach((contract, index) => {
-      console.log(`Adding contract ${index + 1}/${transformedContracts.length}: ${contract.id}`);
+    transformedContracts.forEach((contract) => {
       const docRef = db.collection('contracts').doc(contract.id);
       batch.set(docRef, contract);
     });
-    
-    console.log('All contracts added to batch, committing now...');
-    
+
     try {
       await batch.commit();
-      console.log('✅ Batch commit successful! Contracts saved to Firestore.');
+      console.log('Batch commit successful');
     } catch (error) {
-      console.error('❌ Batch commit failed:', {
-        message: error.message,
-        code: error.code,
-        details: error
-      });
+      console.error('Batch commit failed:', error.message);
       throw error;
     }
     
@@ -203,9 +272,7 @@ exports.handler = async (event, context) => {
       contractCount: transformedContracts.length,
       processingTime: Date.now() - startTime
     });
-    
-    console.log(`Successfully refreshed ${transformedContracts.length} contracts in ${Date.now() - startTime}ms`);
-    
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
